@@ -1,0 +1,2399 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบติดตามเครื่องจักรหยุดทำงาน | Machine Downtime Tracking System</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Bebas+Neue&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#F3F7FC;
+    --panel:#FFFFFF;
+    --panel-2:#EAF2FB;
+    --text:#122142;
+    --text-dim:#5D6C88;
+    --line:#DCE7F5;
+    --blue:#1857B8;
+    --blue-deep:#0D3A85;
+    --blue-tint:#E7F0FC;
+
+    --regen:#2E5FA8;
+    --regen-bg:#E9EFF9;
+    --breakdown:#D6483C;
+    --breakdown-bg:#FCE9E7;
+    --pm:#3E8E7E;
+    --pm-bg:#E7F3F0;
+    --program:#7A52A8;
+    --program-bg:#F0E9F6;
+
+    --fixing:#1857B8;
+    --fixing-bg:#E7EFFC;
+    --waiting:#C4820F;
+    --waiting-bg:#FBF0DD;
+    --pending:#B23B3B;
+    --pending-bg:#FBEAE8;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    min-height:100vh;
+    padding:0 0 60px 0;
+  }
+  .top-bar{
+    height:6px;
+    width:100%;
+    background:linear-gradient(90deg,#0D3A85 0%,#1857B8 45%,#4E8CE0 100%);
+  }
+  .wrap{
+    max-width:1320px;
+    margin:0 auto;
+    padding:0 20px;
+  }
+  header{
+    padding:28px 0 18px 0;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:12px;
+  }
+  .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    letter-spacing:0.14em;
+    color:var(--blue);
+    text-transform:uppercase;
+    margin-bottom:6px;
+    font-weight:600;
+  }
+  h1{
+    font-size:28px;
+    font-weight:700;
+    margin:0 0 4px 0;
+    letter-spacing:-0.01em;
+    color:var(--blue-deep);
+  }
+  .sub{
+    color:var(--text-dim);
+    font-size:13.5px;
+  }
+
+  .stats{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(130px,1fr));
+    gap:12px;
+    margin:22px 0 8px 0;
+  }
+  .stat{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    padding:16px 18px;
+    border-top:3px solid var(--line);
+  }
+  .stat .num{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:44px;
+    line-height:1;
+  }
+  .stat .lbl{
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-top:4px;
+    font-weight:500;
+  }
+  .stat.total{border-top-color:var(--blue);}
+  .stat.total .num{color:var(--blue-deep);}
+  .stat.regen{border-top-color:var(--regen);}
+  .stat.regen .num{color:var(--regen);}
+  .stat.breakdown{border-top-color:var(--breakdown);}
+  .stat.breakdown .num{color:var(--breakdown);}
+  .stat.pm{border-top-color:var(--pm);}
+  .stat.pm .num{color:var(--pm);}
+  .stat.program{border-top-color:var(--program);}
+  .stat.program .num{color:var(--program);}
+
+  .section-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin:32px 0 14px 0;
+  }
+  .section-head h2{
+    font-size:16px;
+    font-weight:600;
+    margin:0;
+    color:var(--blue-deep);
+  }
+  .btn{
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-weight:600;
+    font-size:14px;
+    border:none;
+    border-radius:8px;
+    padding:10px 16px;
+    cursor:pointer;
+    transition:transform .12s ease, filter .12s ease;
+  }
+  .btn:hover{filter:brightness(1.08);}
+  .btn:active{transform:scale(0.97);}
+  .btn-primary{background:var(--blue);color:#fff;}
+  .btn-danger{background:var(--breakdown);color:#fff;}
+  .btn-ghost{background:var(--panel);color:var(--blue-deep);border:1px solid var(--line);}
+  .btn-outline-danger{background:#fff;color:var(--breakdown);border:1px solid var(--breakdown);}
+  .btn-sm{padding:7px 12px;font-size:13px;}
+
+  .reason-group{margin-bottom:26px;}
+  .reason-title{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:10px;
+  }
+  .reason-title .dot{width:10px;height:10px;border-radius:50%;}
+  .reason-title .dot.regen{background:var(--regen);}
+  .reason-title .dot.breakdown{background:var(--breakdown);}
+  .reason-title .dot.pm{background:var(--pm);}
+  .reason-title .dot.program{background:var(--program);}
+  .reason-title .txt{font-weight:700;font-size:15px;}
+  .reason-title .count{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    color:var(--text-dim);
+    background:var(--panel-2);
+    border-radius:20px;
+    padding:2px 10px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(250px,1fr));
+    gap:12px;
+  }
+  .card{
+    background:var(--panel);
+    border-radius:14px;
+    padding:20px 20px 20px 24px;
+    box-shadow:0 1px 2px rgba(13,58,133,0.06), 0 8px 24px rgba(13,58,133,0.07);
+    position:relative;
+    cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .card:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(13,58,133,0.08), 0 14px 32px rgba(13,58,133,0.1);}
+  .card::before{
+    content:"";
+    position:absolute;
+    left:0;top:14px;bottom:14px;
+    width:4px;
+    border-radius:4px;
+    background:var(--accent);
+  }
+  .card .top-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:10px;
+    margin-bottom:2px;
+  }
+  .card .name{font-size:15.5px;font-weight:700;color:var(--blue-deep);line-height:1.35;}
+  .badge{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-size:11px;
+    font-weight:600;
+    padding:4px 9px 4px 7px;
+    border-radius:20px;
+    white-space:nowrap;
+    flex-shrink:0;
+  }
+  .badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .reason-badge-inline{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--accent);
+    margin-top:6px;
+    background:none;
+    padding:0;
+  }
+  .card .hero{
+    display:flex;
+    align-items:baseline;
+    gap:8px;
+    margin:16px 0 2px 0;
+  }
+  .card .hero .num{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:44px;
+    line-height:0.85;
+    color:var(--blue-deep);
+    letter-spacing:0.01em;
+  }
+  .card .hero .unit{
+    font-size:14px;
+    font-weight:600;
+    color:var(--text-dim);
+    padding-bottom:2px;
+  }
+  .card .stopped-since{
+    font-size:12px;
+    color:var(--text-dim);
+    margin-bottom:14px;
+    font-weight:400;
+    border:none;
+    padding-top:0;
+  }
+  .card .stopped-since b{color:var(--text);font-weight:600;}
+  .card .divider{border-top:1px solid var(--line);margin:14px 0;}
+  .card .meta-row{
+    font-size:12.5px;
+    color:var(--text-dim);
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin:0;
+  }
+  .card .reason-tag{
+    font-size:12.5px;
+    color:var(--text);
+    background:var(--panel-2);
+    border-radius:8px;
+    padding:9px 11px;
+    margin-top:12px;
+    line-height:1.5;
+    border-left:2px solid var(--line);
+  }
+  .card .footer{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:14px;
+  }
+  .card .avatar{
+    width:22px;height:22px;
+    border-radius:50%;
+    background:var(--accent);
+    color:#fff;
+    font-size:11px;
+    font-weight:700;
+    display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;
+  }
+  .card .footer .fname{font-size:12px;color:var(--text-dim);}
+
+  .all-clear{
+    background:var(--panel);
+    border:1px dashed var(--line);
+    border-radius:10px;
+    padding:30px 20px;
+    text-align:center;
+    color:var(--blue-deep);
+  }
+  .all-clear .big{font-size:32px;margin-bottom:6px;}
+
+  .log{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:10px;
+    max-height:340px;
+    overflow-y:auto;
+  }
+  .log-item{
+    display:flex;
+    gap:12px;
+    padding:14px 16px;
+    border-bottom:1px solid var(--line);
+    font-size:13.5px;
+    align-items:flex-start;
+  }
+  .log-item:last-child{border-bottom:none;}
+  .case-timeline{
+    margin:8px 0 2px 0;
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+  }
+  .tl-point{
+    display:flex;
+    align-items:flex-start;
+    gap:8px;
+    font-size:12.5px;
+    color:var(--text);
+    line-height:1.5;
+  }
+  .tl-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:5px;}
+  .tl-dot.regen{background:var(--regen);}
+  .tl-dot.breakdown{background:var(--breakdown);}
+  .tl-dot.pm{background:var(--pm);}
+  .tl-dot.program{background:var(--program);}
+  .tl-dot.wait{background:var(--waiting);}
+  .tl-dot.fixing{background:var(--fixing);}
+  .tl-dot.pending{background:var(--pending);}
+  .tl-dot.waiting{background:var(--waiting);}
+  .tl-controls{display:inline-flex;gap:2px;flex-shrink:0;vertical-align:middle;}
+  .tl-btn{
+    background:none;border:none;cursor:pointer;
+    color:var(--text-dim);font-size:12px;
+    padding:2px 5px;border-radius:5px;line-height:1;
+  }
+  .tl-btn:hover{background:var(--panel-2);color:var(--blue);}
+  .tl-btn.tl-del:hover{color:var(--breakdown);background:var(--breakdown-bg);}
+  .toggle-timeline-btn{
+    background:none;border:none;
+    color:var(--blue);font-weight:600;font-size:12.5px;
+    cursor:pointer;padding:4px 0;margin-top:6px;
+    display:inline-flex;align-items:center;gap:4px;
+  }
+  .toggle-timeline-btn:hover{text-decoration:underline;}
+  .case-reason-line{font-size:13px;color:var(--text);margin:4px 0 2px 0;}
+  .case-reason-line b{color:var(--blue-deep);}
+  .tl-dot.resolved{background:#2E8B57;}
+  .tl-time{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:12px;
+    font-weight:700;
+    color:var(--blue-deep);
+    margin-right:6px;
+    white-space:nowrap;
+  }
+  .case-status-pill{
+    font-size:11px;
+    font-weight:600;
+    padding:2px 9px;
+    border-radius:20px;
+    white-space:nowrap;
+  }
+  .case-status-pill.ongoing{background:var(--pending-bg);color:var(--pending);}
+  .case-status-pill.done{background:#E8F4EE;color:#2E8B57;}
+  .case-duration{color:var(--text-dim);font-size:12px;margin-top:4px;}
+  .log-del{
+    background:none;
+    border:none;
+    color:var(--text-dim);
+    cursor:pointer;
+    font-size:16px;
+    line-height:1;
+    padding:2px 4px;
+    border-radius:5px;
+    flex-shrink:0;
+  }
+  .log-del:hover{color:var(--breakdown);background:var(--breakdown-bg);}
+  .log-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  .log-dot.regen{background:var(--regen);}
+  .log-dot.breakdown{background:var(--breakdown);}
+  .log-dot.pm{background:var(--pm);}
+  .log-dot.program{background:var(--program);}
+  .log-dot.deleted{background:var(--text-dim);}
+  .log-dot.resolved{background:#2E8B57;}
+  .log-body .line1{font-weight:600;color:var(--blue-deep);}
+  .log-body .desc{color:var(--text-dim);margin-top:2px;}
+  .log-time{
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    color:var(--text-dim);
+    white-space:nowrap;
+    margin-left:auto;
+    padding-left:10px;
+  }
+  .empty{color:var(--text-dim);font-size:13.5px;padding:24px 16px;text-align:center;}
+
+  .overlay{
+    position:fixed;inset:0;
+    background:rgba(13,58,133,0.28);
+    display:none;
+    align-items:center;justify-content:center;
+    z-index:50;
+    padding:16px;
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:12px;
+    width:100%;max-width:440px;
+    max-height:88vh;
+    overflow-y:auto;
+    padding:22px;
+    box-shadow:0 20px 50px rgba(13,58,133,0.25);
+  }
+  .modal h3{margin:0 0 4px 0;font-size:18px;color:var(--blue-deep);}
+  .modal .modal-sub{color:var(--text-dim);font-size:13px;margin-bottom:18px;}
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:12.5px;
+    font-weight:600;
+    color:var(--text-dim);
+    margin-bottom:6px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  select,input[type=text],input[type=datetime-local],textarea{
+    width:100%;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    color:var(--text);
+    border-radius:7px;
+    padding:10px 11px;
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-size:14px;
+  }
+  select:focus,input:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:1px;}
+  .hint{font-size:11.5px;color:var(--text-dim);margin-top:4px;}
+  textarea{resize:vertical;min-height:70px;}
+
+  .opt-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:8px;}
+  .opt{
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    border-radius:8px;
+    padding:10px 6px;
+    text-align:center;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+    color:var(--text-dim);
+  }
+  .opt.sel-regen{border-color:var(--regen);color:var(--regen);background:var(--regen-bg);}
+  .opt.sel-breakdown{border-color:var(--breakdown);color:var(--breakdown);background:var(--breakdown-bg);}
+  .opt.sel-pm{border-color:var(--pm);color:var(--pm);background:var(--pm-bg);}
+  .opt.sel-program{border-color:var(--program);color:var(--program);background:var(--program-bg);}
+  .opt.sel-fixing{border-color:var(--fixing);color:var(--fixing);background:var(--fixing-bg);}
+  .opt.sel-waiting{border-color:var(--waiting);color:var(--waiting);background:var(--waiting-bg);}
+  .opt.sel-pending{border-color:var(--pending);color:var(--pending);background:var(--pending-bg);}
+  #setRunBtn{border-color:#2E8B57;color:#2E8B57;background:#E8F4EE;font-weight:700;}
+  #setRunBtn:hover{background:#DCEEE4;}
+
+  .modal-actions{display:flex;gap:10px;margin-top:18px;}
+  .modal-actions .btn{flex:1;}
+  .danger-zone{border-top:1px solid var(--line);margin-top:18px;padding-top:14px;}
+
+  ::-webkit-scrollbar{width:8px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+  .fab{
+    position:fixed;
+    right:22px;bottom:22px;
+    background:var(--blue-deep);
+    color:#fff;
+    border:none;
+    border-radius:30px;
+    padding:14px 20px;
+    font-family:'IBM Plex Sans Thai',sans-serif;
+    font-weight:700;
+    font-size:14px;
+    cursor:pointer;
+    box-shadow:0 6px 20px rgba(13,58,133,0.35);
+    display:flex;align-items:center;gap:8px;
+    z-index:40;
+  }
+  .fab:hover{filter:brightness(1.08);}
+  .fab:active{transform:scale(0.97);}
+
+  .paste-zone{
+    border:2px dashed var(--line);
+    border-radius:8px;
+    padding:16px;
+    text-align:center;
+    font-size:13px;
+    color:var(--text-dim);
+    cursor:text;
+    background:var(--panel-2);
+  }
+  .paste-zone:focus{outline:none;border-color:var(--blue);color:var(--blue);}
+  .img-preview-wrap{margin-top:8px;}
+  .img-preview-wrap img{max-width:160px;max-height:160px;border-radius:8px;border:1px solid var(--line);display:block;}
+  .tl-point-wrap{margin-bottom:2px;}
+  .tl-image{margin:4px 0 2px 16px;}
+  .tl-image img{max-width:130px;max-height:130px;border-radius:6px;border:1px solid var(--line);cursor:pointer;}
+
+  select.input-error, input.input-error, .opt-picker.input-error{
+    border-color:var(--breakdown) !important;
+    background:var(--breakdown-bg) !important;
+  }
+  .field-error-msg{
+    color:var(--breakdown);
+    font-size:12px;
+    margin-top:4px;
+    display:none;
+  }
+
+  .manage-machine-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:10px 0;
+    border-bottom:1px solid var(--line);
+    gap:10px;
+  }
+  .manage-machine-row:last-child{border-bottom:none;}
+  .manage-machine-info .mname{font-weight:600;font-size:14px;color:var(--blue-deep);}
+  .manage-machine-info .mmeta{font-size:12px;color:var(--text-dim);margin-top:2px;}
+
+  .history-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .filter-btn{
+    background:var(--panel);
+    border:1px solid var(--line);
+    color:var(--text-dim);
+    border-radius:20px;
+    padding:6px 14px;
+    font-size:12.5px;
+    font-weight:600;
+    cursor:pointer;
+  }
+  .filter-btn.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .history-custom-range{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+  .history-custom-range input[type=date]{width:auto;padding:8px 10px;}
+  .history-extra-filters{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:18px;
+  }
+  .history-extra-filters select{
+    width:auto;
+    min-width:150px;
+    padding:8px 10px;
+    font-size:12.5px;
+  }
+  .leaderboard-head{
+    font-size:13px;
+    font-weight:700;
+    color:var(--blue-deep);
+    margin-bottom:10px;
+  }
+  .rank-num{
+    font-family:'Bebas Neue',sans-serif;
+    font-size:22px;
+    color:var(--blue-deep);
+    width:30px;
+    flex-shrink:0;
+    text-align:center;
+  }
+
+  .main-layout{display:grid;grid-template-columns:1fr 300px;gap:24px;align-items:start;}
+  .side-col{position:sticky;top:20px;}
+  @media (max-width:960px){
+    .main-layout{grid-template-columns:1fr;}
+    .side-col{position:static;}
+  }
+
+  .top5-card{
+    background:var(--panel);
+    border-radius:14px;
+    overflow:hidden;
+    box-shadow:0 1px 2px rgba(13,58,133,0.06), 0 8px 24px rgba(13,58,133,0.08);
+  }
+  .top5-head{
+    background:linear-gradient(135deg,#0D3A85 0%,#1857B8 60%,#4E8CE0 100%);
+    color:#fff;
+    padding:16px 18px;
+    font-weight:700;
+    font-size:14px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .top5-body{padding:6px 16px 4px;}
+  .top5-row{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    padding:11px 0;
+    border-bottom:1px solid var(--line);
+  }
+  .top5-row:last-child{border-bottom:none;}
+  .top5-rank{
+    width:30px;height:30px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:700;
+    font-size:13px;
+    flex-shrink:0;
+    margin-top:1px;
+  }
+  .top5-rank.medal{font-size:16px;}
+  .top5-rank.plain{background:var(--panel-2);color:var(--blue-deep);}
+  .top5-info{flex:1;min-width:0;}
+  .top5-info .tname{font-size:13px;font-weight:700;color:var(--blue-deep);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .top5-info .tstat{font-size:11px;color:var(--text-dim);margin-top:2px;}
+  .top5-bar-track{background:var(--panel-2);border-radius:4px;height:5px;margin-top:7px;overflow:hidden;}
+  .top5-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#1857B8,#4E8CE0);}
+  .top5-footer{
+    padding:12px 16px;
+    border-top:1px solid var(--line);
+    text-align:center;
+  }
+  .top5-footer button{
+    background:none;border:none;
+    color:var(--blue);
+    font-weight:600;
+    font-size:12.5px;
+    cursor:pointer;
+    padding:4px;
+  }
+  .top5-footer button:hover{text-decoration:underline;}
+  .leaderboard-flash{animation:leaderboard-flash 1.1s ease;}
+  @keyframes leaderboard-flash{
+    0%{box-shadow:0 0 0 2px var(--blue);}
+    100%{box-shadow:none;}
+  }
+
+  .admin-section{margin-bottom:18px;}
+  .admin-section > label{
+    display:block;font-size:12.5px;font-weight:700;
+    color:var(--blue-deep);margin-bottom:8px;
+    text-transform:uppercase;letter-spacing:0.04em;
+  }
+  .admin-chip-list{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .admin-chip{
+    display:inline-flex;align-items:center;gap:6px;
+    padding:5px 10px;border-radius:20px;
+    font-size:12.5px;font-weight:600;
+    border:1px solid var(--line);
+  }
+  .admin-chip button{background:none;border:none;cursor:pointer;color:inherit;opacity:0.6;font-size:12px;padding:0;line-height:1;}
+  .admin-chip button:hover{opacity:1;}
+  .admin-add-row{display:flex;gap:6px;flex-wrap:wrap;}
+  .admin-add-row input{flex:1;min-width:110px;}
+  .admin-add-row button{flex-shrink:0;}
+  .admin-divider{border-top:1px solid var(--line);margin:18px 0;}
+  #adminLoginError{color:var(--breakdown);display:none;margin-top:4px;}
+
+  @media (max-width:640px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    h1{font-size:22px;}
+    .opt-picker{grid-template-columns:repeat(2,1fr);}
+  }
+</style>
+</head>
+<body>
+<div class="top-bar"></div>
+<div class="wrap">
+  <header>
+    <div>
+      <div class="eyebrow">Machine Downtime Tracking System</div>
+      <h1>ระบบติดตามเครื่องจักรหยุดทำงาน</h1>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-ghost btn-sm" id="adminBtn">⚙ ผู้ดูแลระบบ · Admin</button>
+      <button class="btn btn-ghost btn-sm" id="manageMachinesBtn">📋 จัดการเครื่องจักร · Manage Machines</button>
+      <button class="btn btn-ghost btn-sm" id="addMachineBtn">+ เพิ่มเครื่องจักร · Add Machine</button>
+    </div>
+  </header>
+
+  <div class="stats" id="stats"></div>
+
+  <div class="main-layout">
+    <div class="main-col">
+
+      <div class="section-head"><h2>เครื่องจักรที่หยุดทำงาน · Stopped Machines</h2></div>
+      <div id="groupedGrid"></div>
+
+      <div class="section-head">
+        <h2>ประวัติเครื่องจักรหยุด · Downtime History</h2>
+        <button class="btn btn-ghost btn-sm" id="clearLogBtn">🔒 ล้างประวัติทั้งหมด (ผู้ดูแล) · Clear All (Admin)</button>
+      </div>
+      <div class="history-filter" id="historyFilterBar">
+        <button class="filter-btn active" data-range="all">ทั้งหมด · All</button>
+        <button class="filter-btn" data-range="today">วันนี้ · Today</button>
+        <button class="filter-btn" data-range="week">สัปดาห์นี้ · This Week</button>
+        <button class="filter-btn" data-range="month">เดือนนี้ · This Month</button>
+        <button class="filter-btn" data-range="year">ปีนี้ · This Year</button>
+        <button class="filter-btn" data-range="custom">กำหนดเอง · Custom</button>
+      </div>
+      <div class="history-custom-range" id="historyCustomRange" style="display:none;">
+        <input type="date" id="historyFromDate">
+        <span style="color:var(--text-dim);font-size:13px;">ถึง · to</span>
+        <input type="date" id="historyToDate">
+        <button class="btn btn-primary btn-sm" id="historyApplyRange">ใช้ตัวกรอง · Apply</button>
+      </div>
+      <div class="history-extra-filters" id="historyExtraFilters">
+        <select id="historyDeptSelect"></select>
+        <select id="historyLineSelect"></select>
+        <select id="historyMachineSelect"></select>
+      </div>
+
+      <div class="leaderboard-head" id="leaderboardHead">🏆 อันดับเครื่องที่หยุดบ่อยที่สุด (ตามตัวกรองด้านบน) · Most Frequently Stopped (matches filters above)</div>
+      <div class="log" id="leaderboardList" style="margin-bottom:24px;"></div>
+
+      <div class="log" id="logList"></div>
+
+    </div>
+
+    <div class="side-col">
+      <div class="top5-card">
+        <div class="top5-head">🏆 Top 5 เครื่องหยุดบ่อย</div>
+        <div class="top5-body" id="top5List"></div>
+        <div class="top5-footer">
+          <button id="top5ViewAllBtn">ดูอันดับเต็ม · View Full Ranking →</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<button class="fab" id="reportFab">➕ แจ้งเครื่องจักรมีปัญหา · Report Issue</button>
+
+<!-- Report issue modal -->
+<div class="overlay" id="reportOverlay">
+  <div class="modal">
+    <h3>แจ้งปัญหาเครื่องจักร · Report Machine Issue</h3>
+    <div class="field">
+      <label>เลือกเครื่องจักร · Select Machine</label>
+      <select id="reportMachineSelect"></select>
+      <div class="field-error-msg" id="reportMachineError"></div>
+    </div>
+    <div class="field">
+      <label>เวลาที่เริ่มหยุดเครื่อง · Downtime Start Time</label>
+      <input type="datetime-local" id="reportTime">
+      <div class="field-error-msg" id="reportTimeError"></div>
+    </div>
+    <div class="field">
+      <label>สาเหตุที่หยุด · Reason</label>
+      <select id="reportReasonSelect"></select>
+      <div class="field-error-msg" id="reportReasonError"></div>
+    </div>
+    <div class="field">
+      <label>สถานะการติดตาม · Tracking Status</label>
+      <select id="reportTrackSelect"></select>
+      <div class="field-error-msg" id="reportTrackError"></div>
+    </div>
+    <div class="field">
+      <label>รายละเอียดปัญหา · Details</label>
+      <textarea id="reportDesc" placeholder="อธิบายอาการที่พบ... / Describe the issue..."></textarea>
+    </div>
+    <div class="field">
+      <label>แนบรูป (วาง Ctrl+V) · Attach Image (paste)</label>
+      <div class="paste-zone" id="reportPasteZone" tabindex="0">📋 คลิกที่นี่แล้ววาง Ctrl+V · Click here, then paste (Ctrl+V)</div>
+      <div class="img-preview-wrap" id="reportImagePreviewWrap" style="display:none;">
+        <img id="reportImagePreview">
+        <button class="btn btn-ghost btn-sm" id="reportImageRemove" style="margin-top:6px;">✕ ลบรูป · Remove</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>ผู้แจ้ง · Reported By</label>
+      <select id="reportName"></select>
+      <input type="text" id="reportNameOther" placeholder="พิมพ์ชื่อ / Type name" style="margin-top:8px;display:none;">
+      <div class="field-error-msg" id="reportNameError"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="reportCancel">ยกเลิก · Cancel</button>
+      <button class="btn btn-primary" id="reportSubmit">แจ้งปัญหา · Submit</button>
+    </div>
+  </div>
+</div>
+
+<!-- Machine detail modal -->
+<div class="overlay" id="detailOverlay">
+  <div class="modal">
+    <h3 id="detailName"></h3>
+    <div class="modal-sub" id="detailMeta"></div>
+
+    <div class="field">
+      <label>ผู้ดำเนินการ · Updated By</label>
+      <select id="detailReporter"></select>
+      <input type="text" id="detailReporterOther" placeholder="พิมพ์ชื่อ / Type name" style="margin-top:8px;display:none;">
+    </div>
+    <div class="field">
+      <label>เวลาของการดำเนินการนี้ · Action Time</label>
+      <input type="datetime-local" id="detailTime">
+    </div>
+
+    <div class="field">
+      <label>สถานะเครื่อง · Machine Status</label>
+      <div class="opt-picker">
+        <div class="opt" id="setRunBtn" style="grid-column:1/-1;">✔ แก้ไขแล้ว (ย้ายไปประวัติ) · Resolved (Move to History)</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>สาเหตุที่หยุด · Reason</label>
+      <select id="detailReasonSelect"></select>
+    </div>
+    <div class="field">
+      <label>สถานะการติดตาม · Tracking Status</label>
+      <select id="detailTrackSelect"></select>
+    </div>
+    <div class="field">
+      <label>บันทึกเพิ่มเติม (ไม่บังคับ) · Notes (optional)</label>
+      <textarea id="detailNote" placeholder="เช่น เปลี่ยนอะไหล่แล้ว, รอช่าง... / e.g. part replaced, waiting on technician..."></textarea>
+      <div class="paste-zone" id="detailPasteZone" tabindex="0" style="margin-top:8px;">📋 คลิกที่นี่แล้ววาง Ctrl+V · Click here, then paste (Ctrl+V)</div>
+      <div class="img-preview-wrap" id="detailImagePreviewWrap" style="display:none;">
+        <img id="detailImagePreview">
+        <button class="btn btn-ghost btn-sm" id="detailImageRemove" style="margin-top:6px;">✕ ลบรูป · Remove</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="detailAddNote" style="margin-top:8px;width:100%;">📝 เพิ่มบันทึกไทม์ไลน์ (ไม่เปลี่ยนสถานะ) · Add Timeline Note (status unchanged)</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="detailCancel">ปิด · Close</button>
+      <button class="btn btn-primary" id="detailSave">บันทึกสถานะ · Save</button>
+    </div>
+    <div class="danger-zone">
+      <button class="btn btn-outline-danger" id="detailDelete" style="width:100%;">🗑 ลบรายการแจ้งนี้ · Delete This Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add machine modal -->
+<div class="overlay" id="addOverlay">
+  <div class="modal">
+    <h3>เพิ่มเครื่องจักรใหม่ · Add New Machine</h3>
+    <div class="field"><label>ชื่อเครื่องจักร · Machine Name</label><input type="text" id="addName" placeholder="เช่น เครื่องปั๊มขึ้นรูป #2 / e.g. Press Machine #2"></div>
+    <div class="field"><label>แผนก · Department</label>
+      <select id="addDept"></select>
+    </div>
+    <div class="field"><label>ไลน์ผลิต · Line</label>
+      <select id="addLine">
+        <option value="SMD1">SMD1</option>
+        <option value="SMD2">SMD2</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="addCancel">ยกเลิก · Cancel</button>
+      <button class="btn btn-primary" id="addSave">เพิ่มเครื่องจักร · Add</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage machines modal (open to everyone — fix typo'd names or remove decommissioned machines) -->
+<div class="overlay" id="manageMachinesOverlay">
+  <div class="modal" style="max-width:520px;">
+    <h3>จัดการเครื่องจักร · Manage Machines</h3>
+    <div id="manageMachinesList" style="max-height:400px;overflow-y:auto;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-primary" id="manageMachinesClose">ปิด · Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit timeline entry modal -->
+<div class="overlay" id="editPointOverlay">
+  <div class="modal">
+    <h3>แก้ไขไทม์ไลน์ · Edit Timeline Entry</h3>
+    <div class="modal-sub" id="editPointMeta"></div>
+    <div class="field">
+      <label>เวลา · Time</label>
+      <input type="datetime-local" id="editPointTime">
+    </div>
+    <div class="field">
+      <label>สาเหตุที่หยุด · Reason</label>
+      <select id="editPointReason"></select>
+    </div>
+    <div class="field">
+      <label>สถานะการติดตาม · Tracking Status</label>
+      <select id="editPointTrack"></select>
+    </div>
+    <div class="field">
+      <label>รายละเอียด (ไม่บังคับ) · Details (optional)</label>
+      <textarea id="editPointDesc"></textarea>
+    </div>
+    <div class="field">
+      <label>แนบรูป (วาง Ctrl+V) · Attach Image (paste)</label>
+      <div class="paste-zone" id="editPointPasteZone" tabindex="0">📋 คลิกที่นี่แล้ววาง Ctrl+V · Click here, then paste (Ctrl+V)</div>
+      <div class="img-preview-wrap" id="editPointImagePreviewWrap" style="display:none;">
+        <img id="editPointImagePreview">
+        <button class="btn btn-ghost btn-sm" id="editPointImageRemove" style="margin-top:6px;">✕ ลบรูป · Remove</button>
+      </div>
+    </div>
+    <div class="field">
+      <label>ผู้แจ้ง/ผู้ดำเนินการ · Reporter</label>
+      <select id="editPointReporter"></select>
+      <input type="text" id="editPointReporterOther" placeholder="พิมพ์ชื่อ / Type name" style="margin-top:8px;display:none;">
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="editPointCancel">ยกเลิก · Cancel</button>
+      <button class="btn btn-primary" id="editPointSave">บันทึก · Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin login modal -->
+<div class="overlay" id="adminLoginOverlay">
+  <div class="modal">
+    <h3>เข้าสู่ระบบผู้ดูแล · Admin Login</h3>
+    <div class="field">
+      <label>รหัสผ่านผู้ดูแล · Admin PIN</label>
+      <input type="text" id="adminPinInput" placeholder="••••">
+      <div id="adminLoginError">รหัสผ่านไม่ถูกต้อง · Incorrect PIN</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="adminLoginCancel">ยกเลิก · Cancel</button>
+      <button class="btn btn-primary" id="adminLoginSubmit">เข้าสู่ระบบ · Login</button>
+    </div>
+  </div>
+</div>
+
+<!-- Admin panel modal -->
+<div class="overlay" id="adminPanelOverlay">
+  <div class="modal" style="max-width:560px;">
+    <h3>ผู้ดูแลระบบ · Admin Panel</h3>
+
+    <div class="admin-section">
+      <label>สาเหตุที่หยุด · Reasons</label>
+      <div class="admin-chip-list" id="adminReasonList"></div>
+      <div class="admin-add-row">
+        <input type="text" id="newReasonEmoji" placeholder="อีโมจิ · Emoji" style="max-width:70px;flex:0 0 60px;">
+        <input type="text" id="newReasonTh" placeholder="ชื่อสาเหตุ (ไทย)">
+        <input type="text" id="newReasonEn" placeholder="Reason (English)">
+        <button class="btn btn-primary btn-sm" id="addReasonBtn">+ เพิ่ม · Add</button>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <label>สถานะการติดตาม · Tracking Statuses</label>
+      <div class="admin-chip-list" id="adminTrackList"></div>
+      <div class="admin-add-row">
+        <input type="text" id="newTrackTh" placeholder="ชื่อสถานะ (ไทย)">
+        <input type="text" id="newTrackEn" placeholder="Status (English)">
+        <button class="btn btn-primary btn-sm" id="addTrackBtn">+ เพิ่ม · Add</button>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <label>รายชื่อผู้แจ้ง / ผู้ช่วย · Reporter / Staff Names</label>
+      <div class="admin-chip-list" id="adminStaffList"></div>
+      <div class="admin-add-row">
+        <input type="text" id="newStaffName" placeholder="ชื่อ · Name">
+        <button class="btn btn-primary btn-sm" id="addStaffBtn">+ เพิ่ม · Add</button>
+      </div>
+    </div>
+
+    <div class="admin-section">
+      <label>แผนก · Departments</label>
+      <div class="admin-chip-list" id="adminDeptList"></div>
+      <div class="admin-add-row">
+        <input type="text" id="newDeptName" placeholder="ชื่อแผนก · Department name">
+        <button class="btn btn-primary btn-sm" id="addDeptBtn">+ เพิ่ม · Add</button>
+      </div>
+    </div>
+
+    <div class="admin-divider"></div>
+    <div class="admin-section">
+      <label>สำรอง / กู้คืนข้อมูล · Backup &amp; Restore</label>
+      <div class="admin-add-row">
+        <button class="btn btn-ghost btn-sm" id="exportJsonBtn">💾 ส่งออกข้อมูลสำรอง (JSON) · Export Backup</button>
+        <button class="btn btn-ghost btn-sm" id="exportTextBtn">📋 แสดงเป็นข้อความ (คัดลอก) · Show as Text</button>
+        <button class="btn btn-ghost btn-sm" id="exportCsvBtn">📄 ส่งออกประวัติ (CSV) · Export History</button>
+      </div>
+      <div class="admin-add-row" style="margin-top:8px;">
+        <input type="file" id="importFileInput" accept="application/json" style="display:none;">
+        <button class="btn btn-ghost btn-sm" id="importBtn">📂 นำเข้าจากไฟล์สำรอง · Import from Backup</button>
+      </div>
+      <div id="importError" class="hint" style="color:var(--breakdown);display:none;"></div>
+    </div>
+
+    <div class="admin-divider"></div>
+    <div class="admin-section" style="margin-bottom:0;">
+      <label>เปลี่ยนรหัสผ่านผู้ดูแล · Change Admin PIN</label>
+      <div class="admin-add-row">
+        <input type="text" id="newAdminPin" placeholder="รหัสผ่านใหม่ · New PIN">
+        <button class="btn btn-ghost btn-sm" id="changePinBtn">บันทึก · Save</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="adminLogoutBtn">ออกจากระบบผู้ดูแล · Log Out</button>
+      <button class="btn btn-primary" id="adminPanelClose">ปิด · Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export-as-text modal (fallback for when file downloads don't work, e.g. on mobile) -->
+<div class="overlay" id="exportTextOverlay">
+  <div class="modal" style="max-width:600px;">
+    <h3>ข้อมูลสำรอง (คัดลอกได้) · Backup Data (copyable)</h3>
+    <div class="field">
+      <textarea id="exportTextArea" readonly style="width:100%;height:280px;font-family:'IBM Plex Mono',monospace;font-size:11px;"></textarea>
+    </div>
+    <div class="hint" id="exportCopyStatus" style="display:none;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="exportTextClose">ปิด · Close</button>
+      <button class="btn btn-primary" id="exportTextCopy">📋 คัดลอกทั้งหมด · Copy All</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog (custom, since native confirm() is unreliable inside sandboxed artifacts) -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal">
+    <h3 id="confirmTitle">ยืนยันการลบ · Confirm Delete</h3>
+    <div class="modal-sub" id="confirmMsg"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="confirmNo">ยกเลิก · Cancel</button>
+      <button class="btn btn-danger" id="confirmYes">ยืนยันลบ · Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---- storage shim: makes window.storage talk to our own /api/storage backend ----
+// (backed by Vercel KV) instead of the Claude-artifact-only storage API. The rest
+// of this file is completely unchanged — every window.storage.get/set call below
+// keeps working exactly as before.
+window.storage = {
+  async get(key, shared){
+    const res = await fetch(`/api/storage?key=${encodeURIComponent(key)}`);
+    if(res.status === 404) throw new Error('not found');
+    if(!res.ok) throw new Error('storage get failed: ' + res.status);
+    const data = await res.json();
+    return { key, value: data.value, shared: true };
+  },
+  async set(key, value, shared){
+    const res = await fetch('/api/storage', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ key, value })
+    });
+    if(!res.ok) throw new Error('storage set failed: ' + res.status);
+    return { key, value, shared: true };
+  }
+};
+
+let REASONS = [];
+let TRACKS = [];
+let STAFF = [];
+let DEPTS = [];
+let ADMIN_PIN = '1234';
+let isAdmin = false;
+let pendingAdminAction = null;
+let REASON_LABEL = {}, REASON_LABEL_EN = {}, REASON_COLOR = {}, REASON_EMOJI = {};
+let TRACK_LABEL = {}, TRACK_LABEL_EN = {}, TRACK_COLOR = {};
+const PALETTE = ['#2E5FA8','#D6483C','#3E8E7E','#7A52A8','#C4820F','#1857B8','#B23B3B','#2E8B57','#8E6E53','#5A6FD8','#C24E8A','#4A9DBF'];
+const DEFAULT_EMOJI = '🏷️';
+function defaultDepts(){ return ['Load Blank','Flash EG','BP','Bonding & Check Bond','Load Base','AOI & Base Sheet']; }
+function defaultReasons(){ return [
+  {key:'regen', label:'Regeneration', labelEn:'Regeneration', color:'#2E5FA8', emoji:'🔄'},
+  {key:'breakdown', label:'เครื่องเสีย', labelEn:'Breakdown', color:'#D6483C', emoji:'⚠️'},
+  {key:'pm', label:'ทำ PM', labelEn:'Preventive Maintenance', color:'#3E8E7E', emoji:'🔧'},
+  {key:'program', label:'ทำโปรแกรม', labelEn:'Programming', color:'#7A52A8', emoji:'💻'}
+];}
+function defaultTracks(){ return [
+  {key:'fixing', label:'กำลังแก้ไข', labelEn:'In Progress', color:'#1857B8'},
+  {key:'waiting', label:'รออะไหล่', labelEn:'Waiting Parts', color:'#C4820F'},
+  {key:'pending', label:'รอแก้ไข', labelEn:'Pending', color:'#B23B3B'}
+];}
+function nextColor(count){ return PALETTE[count % PALETTE.length]; }
+function rebuildLabelMaps(){
+  REASON_LABEL={}; REASON_LABEL_EN={}; REASON_COLOR={}; REASON_EMOJI={};
+  REASONS.forEach(r=>{ REASON_LABEL[r.key]=r.label; REASON_LABEL_EN[r.key]=r.labelEn; REASON_COLOR[r.key]=r.color; REASON_EMOJI[r.key]=r.emoji||DEFAULT_EMOJI; });
+  TRACK_LABEL={}; TRACK_LABEL_EN={}; TRACK_COLOR={};
+  TRACKS.forEach(t=>{ TRACK_LABEL[t.key]=t.label; TRACK_LABEL_EN[t.key]=t.labelEn; TRACK_COLOR[t.key]=t.color; });
+}
+function reasonColor(key){ return REASON_COLOR[key] || '#7A8699'; }
+function reasonEmoji(key){ return REASON_EMOJI[key] || DEFAULT_EMOJI; }
+function trackColor(key){ return TRACK_COLOR[key] || '#7A8699'; }
+function tint(hex, a){
+  hex = hex || '#7A8699';
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+// ---- Custom confirm dialog (native confirm() can be blocked inside a sandboxed artifact) ----
+const confirmOverlay = document.getElementById('confirmOverlay');
+let confirmCallback = null;
+function showConfirm(title, msg, onYes, opts){
+  opts = opts || {};
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmMsg').textContent = msg;
+  const yesBtn = document.getElementById('confirmYes');
+  const noBtn = document.getElementById('confirmNo');
+  yesBtn.textContent = opts.confirmLabel || 'ยืนยันลบ · Confirm';
+  yesBtn.className = opts.confirmClass || 'btn btn-danger';
+  noBtn.style.display = opts.hideCancel ? 'none' : '';
+  confirmCallback = onYes;
+  confirmOverlay.classList.add('show');
+}
+document.getElementById('confirmYes').onclick = async ()=>{
+  confirmOverlay.classList.remove('show');
+  const cb = confirmCallback; confirmCallback = null;
+  if(cb) await cb();
+};
+document.getElementById('confirmNo').onclick = ()=>{
+  confirmOverlay.classList.remove('show');
+  confirmCallback = null;
+};
+
+let machines = [];
+let cases = [];
+let selectedMachineId = null;
+let selReason = null;
+let selTrack = null;
+
+function fmtTime(ts){
+  const d = new Date(ts);
+  return d.toLocaleString('th-TH',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+function fmtTimeShort(ts){
+  const d = new Date(ts);
+  const pad = n=>String(n).padStart(2,'0');
+  return `${pad(d.getHours())}.${pad(d.getMinutes())} น.`;
+}
+// generates a guaranteed-unique id from real wall-clock time + a random suffix.
+// deliberately NOT derived from a user-editable display timestamp (e.g. a chosen
+// downtime start time), since two different reports can share the same minute.
+function uniqueId(prefix){
+  return prefix + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+}
+function formatDuration(ms){
+  const mins = Math.max(0, Math.floor(ms/60000));
+  if(mins<60) return `${mins} นาที · ${mins} min`;
+  const hrs = Math.floor(mins/60), remMin = mins%60;
+  if(hrs<24) return `${hrs} ชม. ${remMin} นาที · ${hrs}h ${remMin}m`;
+  const days = Math.floor(hrs/24), remHr = hrs%24;
+  return `${days} วัน ${remHr} ชม. · ${days}d ${remHr}h`;
+}
+function formatDurationTH(ms){
+  const mins = Math.max(0, Math.floor(ms/60000));
+  if(mins<60) return `${mins} นาที`;
+  const hrs = Math.floor(mins/60), remMin = mins%60;
+  if(hrs<24) return `${hrs} ชม. ${remMin} นาที`;
+  const days = Math.floor(hrs/24), remHr = hrs%24;
+  return `${days} วัน ${remHr} ชม.`;
+}
+function heroDuration(ms){
+  const mins = Math.max(0, Math.floor(ms/60000));
+  if(mins<60) return {num:mins, unit:'นาที'};
+  const hrs = Math.floor(mins/60), remMin = mins%60;
+  if(hrs<24) return {num:hrs, unit:`ชม. ${remMin} นาที`};
+  const days = Math.floor(hrs/24), remHr = hrs%24;
+  return {num:days, unit:`วัน ${remHr} ชม.`};
+}
+function avatarInitial(name){
+  const n = (name||'').trim();
+  return n ? n.substring(0,1) : '?';
+}
+function toLocalInputValue(ts){
+  const d = new Date(ts);
+  const pad = n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+function fromLocalInputValue(str){
+  if(!str) return Date.now();
+  const t = new Date(str).getTime();
+  return isNaN(t) ? Date.now() : t;
+}
+
+// ---- Paste-to-attach images (compressed client-side so they don't blow past storage limits) ----
+let reportImageData = null;
+let detailImageData = null;
+let editPointImageData = null;
+function resizeImageFile(file, maxW, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (e)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let w = img.width, h = img.height;
+        if(w > maxW){ h = Math.round(h * maxW / w); w = maxW; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+function wirePasteZone(zoneId, wrapId, imgId, removeId, setter){
+  const zone = document.getElementById(zoneId);
+  zone.addEventListener('paste', async (e)=>{
+    const items = (e.clipboardData || window.clipboardData).items;
+    for(const item of items){
+      if(item.type.indexOf('image')===0){
+        const file = item.getAsFile();
+        try{
+          const dataUrl = await resizeImageFile(file, 480, 0.5);
+          setter(dataUrl);
+          document.getElementById(imgId).src = dataUrl;
+          document.getElementById(wrapId).style.display = 'block';
+        }catch(err){ console.error('paste image failed', err); }
+        e.preventDefault();
+        break;
+      }
+    }
+  });
+  document.getElementById(removeId).onclick = ()=>{
+    setter(null);
+    document.getElementById(wrapId).style.display = 'none';
+  };
+}
+wirePasteZone('reportPasteZone','reportImagePreviewWrap','reportImagePreview','reportImageRemove', v=>reportImageData=v);
+wirePasteZone('detailPasteZone','detailImagePreviewWrap','detailImagePreview','detailImageRemove', v=>detailImageData=v);
+wirePasteZone('editPointPasteZone','editPointImagePreviewWrap','editPointImagePreview','editPointImageRemove', v=>editPointImageData=v);
+
+function seedMachines(){
+  return [];
+}
+
+async function loadData(){
+  try{ const m = await window.storage.get('machines', true); machines = m ? JSON.parse(m.value) : seedMachines(); }
+  catch(e){ machines = seedMachines(); }
+
+  // one-time cleanup: purge any leftover example machines from earlier versions of this dashboard
+  const EXAMPLE_IDS = ['m1','m2','m3','m4','m5','m6','m7'];
+  machines = machines.filter(m => !EXAMPLE_IDS.includes(m.id));
+  machines.forEach(m => { if(m.currentCaseId===undefined) m.currentCaseId = null; });
+
+  let casesExisted = false;
+  try{ const c = await window.storage.get('cases', true); if(c){ cases = JSON.parse(c.value); casesExisted = true; } else { cases = []; } }
+  catch(e){ cases = []; }
+
+  if(!casesExisted){
+    // migrate legacy flat 'issues' log (if any) into grouped cases, one case per downtime incident
+    let legacyIssues = [];
+    try{ const i = await window.storage.get('issues', true); legacyIssues = i ? JSON.parse(i.value) : []; }
+    catch(e){ legacyIssues = []; }
+    legacyIssues = legacyIssues.filter(it => !EXAMPLE_IDS.includes(it.machineId));
+    const chrono = legacyIssues.slice().reverse(); // oldest first
+    const openByMachine = {};
+    chrono.forEach(it=>{
+      if(it.deleted){
+        cases.push({id:it.id, type:'deleted', machineId:it.machineId, machineName:it.machineName, timestamp:it.timestamp});
+        return;
+      }
+      if(it.resolved){
+        const open = openByMachine[it.machineId];
+        if(open){ open.resolvedAt = it.timestamp; open.events.push({track:'resolved', desc:it.desc||'', reporter:it.reporter, timestamp:it.timestamp}); delete openByMachine[it.machineId]; }
+        return;
+      }
+      let open = openByMachine[it.machineId];
+      if(!open){
+        open = {id:it.id, type:'case', machineId:it.machineId, machineName:it.machineName, reason:it.reason, startedAt:it.timestamp, resolvedAt:null, events:[]};
+        cases.push(open);
+        openByMachine[it.machineId] = open;
+      }
+      open.reason = it.reason || open.reason;
+      open.events.push({track:it.track, desc:it.desc||'', reporter:it.reporter, timestamp:it.timestamp});
+    });
+    // link still-open cases to their machine
+    Object.keys(openByMachine).forEach(mid=>{
+      const m = machines.find(x=>x.id===mid);
+      if(m && m.status==='stopped') m.currentCaseId = openByMachine[mid].id;
+    });
+    cases.sort((a,b)=> (b.resolvedAt||b.startedAt||b.timestamp||0) - (a.resolvedAt||a.startedAt||a.timestamp||0));
+    await saveCases();
+  }
+
+  // safety net: any machine marked stopped but missing a case (e.g. very old data) gets one synthesized
+  let needSave = false;
+  machines.forEach(m=>{
+    if(m.status==='stopped' && !m.currentCaseId){
+      const now = m.updatedAt || Date.now();
+      const c = {id:uniqueId('c'), type:'case', machineId:m.id, machineName:m.name, reason:m.reason||'breakdown', startedAt:now, resolvedAt:null, events:[{track:m.track||'pending', desc:m.note||'', reporter:m.updatedBy||'ระบบ', timestamp:now}]};
+      cases.unshift(c);
+      m.currentCaseId = c.id;
+      needSave = true;
+    }
+  });
+  if(needSave){ await saveCases(); }
+
+  // repair: de-duplicate case ids (guards against a since-fixed bug where a
+  // user-editable timestamp could produce colliding ids across different machines,
+  // causing an update meant for one machine to land on another's case)
+  const seenCaseIds = new Set();
+  let dedupeChanged = false;
+  cases.forEach(c=>{
+    if(c.type!=='case') return;
+    if(seenCaseIds.has(c.id)){
+      const oldId = c.id;
+      const newId = uniqueId('c');
+      c.id = newId;
+      const owner = machines.find(m=>m.id===c.machineId && m.currentCaseId===oldId);
+      if(owner) owner.currentCaseId = newId;
+      dedupeChanged = true;
+    } else {
+      seenCaseIds.add(c.id);
+    }
+  });
+  if(dedupeChanged){ await saveCases(); await saveMachines(); }
+
+  try{ const r = await window.storage.get('reasonTypes', true); REASONS = r ? JSON.parse(r.value) : defaultReasons(); }
+  catch(e){ REASONS = defaultReasons(); }
+  try{ const t = await window.storage.get('trackTypes', true); TRACKS = t ? JSON.parse(t.value) : defaultTracks(); }
+  catch(e){ TRACKS = defaultTracks(); }
+  try{ const s = await window.storage.get('staffList', true); STAFF = s ? JSON.parse(s.value) : []; }
+  catch(e){ STAFF = []; }
+  try{ const dp = await window.storage.get('deptList', true); DEPTS = dp ? JSON.parse(dp.value) : defaultDepts(); }
+  catch(e){ DEPTS = defaultDepts(); }
+  try{ const p = await window.storage.get('adminPin', true); ADMIN_PIN = p ? JSON.parse(p.value) : '1234'; }
+  catch(e){ ADMIN_PIN = '1234'; }
+  if(!(await hasKey('reasonTypes'))) await saveReasons();
+  if(!(await hasKey('trackTypes'))) await saveTracks();
+  if(!(await hasKey('staffList'))) await saveStaff();
+  if(!(await hasKey('deptList'))) await saveDepts();
+  if(!(await hasKey('adminPin'))) await saveAdminPin();
+  rebuildLabelMaps();
+
+  await saveMachines();
+  render();
+}
+async function hasKey(key){ try{ const r = await window.storage.get(key, true); return !!r; }catch(e){ return false; } }
+async function saveMachines(){ try{ await window.storage.set('machines', JSON.stringify(machines), true); }catch(e){ console.error(e); } }
+async function saveCases(){ try{ await window.storage.set('cases', JSON.stringify(cases.slice(0,200)), true); }catch(e){ console.error(e); } }
+async function saveReasons(){ try{ await window.storage.set('reasonTypes', JSON.stringify(REASONS), true); }catch(e){ console.error(e); } }
+async function saveTracks(){ try{ await window.storage.set('trackTypes', JSON.stringify(TRACKS), true); }catch(e){ console.error(e); } }
+async function saveStaff(){ try{ await window.storage.set('staffList', JSON.stringify(STAFF), true); }catch(e){ console.error(e); } }
+async function saveDepts(){ try{ await window.storage.set('deptList', JSON.stringify(DEPTS), true); }catch(e){ console.error(e); } }
+async function saveAdminPin(){ try{ await window.storage.set('adminPin', JSON.stringify(ADMIN_PIN), true); }catch(e){ console.error(e); } }
+
+// open (or continue) the current downtime case for a machine.
+// forceNewEvent=true always appends a new timeline entry (e.g. an explicit report).
+// forceNewEvent=false only appends when the reason, track, or note text actually changed;
+// a pure time-only edit (same reason/track/desc) just updates the most recent entry in
+// place instead of cluttering the timeline.
+function touchCase(m, reason, track, desc, reporter, now, forceNewEvent, image){
+  const lastEvent = (m.currentCaseId) ? (cases.find(c=>c.id===m.currentCaseId && c.type==='case')||{}).events : null;
+  const prevDesc = (lastEvent && lastEvent.length) ? (lastEvent[lastEvent.length-1].desc||'') : (m.note||'');
+  const descChanged = (desc||'') !== '' && (desc||'') !== prevDesc;
+  const changed = (m.reason!==reason) || (m.track!==track) || descChanged;
+  if(m.currentCaseId){
+    const idx = cases.findIndex(c=>c.id===m.currentCaseId && c.type==='case');
+    if(idx>=0){
+      const c = cases[idx];
+      c.reason = reason;
+      if(forceNewEvent || changed || c.events.length===0){
+        c.events.push({track, desc, reporter, timestamp: now, image: image||null});
+      } else {
+        const last = c.events[c.events.length-1];
+        last.timestamp = now;
+        last.reporter = reporter;
+        if(image) last.image = image;
+      }
+      c.events.sort((a,b)=>a.timestamp-b.timestamp);
+      c.startedAt = c.events[0].timestamp;
+      cases.splice(idx,1); cases.unshift(c);
+      return;
+    }
+  }
+  const c = {id:uniqueId('c'), type:'case', machineId:m.id, machineName:m.name, reason, startedAt:now, resolvedAt:null, events:[{track, desc, reporter, timestamp:now, image: image||null}]};
+  cases.unshift(c);
+  m.currentCaseId = c.id;
+}
+// close the current downtime case for a machine (marks it resolved)
+function resolveCase(m, reporter, now, image){
+  if(!m.currentCaseId) return;
+  const idx = cases.findIndex(c=>c.id===m.currentCaseId && c.type==='case');
+  if(idx>=0){
+    const c = cases[idx];
+    c.resolvedAt = now;
+    c.events.push({track:'resolved', desc:'แก้ไขแล้ว กลับมาทำงานปกติ', reporter, timestamp: now, image: image||null});
+    c.events.sort((a,b)=>a.timestamp-b.timestamp);
+    cases.splice(idx,1); cases.unshift(c);
+  }
+  m.currentCaseId = null;
+}
+// logs a progress note on the machine's currently open case without changing its reason/track —
+// for continuous fixes on the same incident (same machine, same symptom, same case)
+function addProgressNote(m, desc, reporter, now, image){
+  if(!m.currentCaseId) return false;
+  const idx = cases.findIndex(c=>c.id===m.currentCaseId && c.type==='case');
+  if(idx<0) return false;
+  const c = cases[idx];
+  c.events.push({track: m.track, desc, reporter, timestamp: now, kind:'note', image: image||null});
+  c.events.sort((a,b)=>a.timestamp-b.timestamp);
+  c.startedAt = c.events[0].timestamp;
+  cases.splice(idx,1); cases.unshift(c);
+  return true;
+}
+
+function render(){ renderStats(); renderGrouped(); renderHistoryFilterOptions(); renderLeaderboard(); renderTop5(); renderLog(); renderMachineSelect(); }
+
+function renderStats(){
+  const stopped = machines.filter(m=>m.status==='stopped');
+  const counts = {};
+  REASONS.forEach(r=>counts[r.key]=0);
+  stopped.forEach(m=>{ if(counts[m.reason]!==undefined) counts[m.reason]++; });
+  const el = document.getElementById('stats');
+  el.innerHTML = `
+    <div class="stat total" style="border-top-color:var(--blue);"><div class="num" style="color:var(--blue-deep);">${stopped.length}</div><div class="lbl">เครื่องหยุดทำงานทั้งหมด · Total Stopped</div></div>
+    ${REASONS.map(r=>`
+      <div class="stat" style="border-top-color:${r.color};">
+        <div class="num" style="color:${r.color};">${counts[r.key]||0}</div>
+        <div class="lbl">${r.emoji||''} ${escapeHtml(r.label)} · ${escapeHtml(r.labelEn||'')}</div>
+      </div>
+    `).join('')}
+  `;
+}
+
+function renderGrouped(){
+  const el = document.getElementById('groupedGrid');
+  const stopped = machines.filter(m=>m.status==='stopped');
+  if(machines.length===0){
+    el.innerHTML = `<div class="all-clear"><div class="big">🏭</div>ยังไม่มีเครื่องจักรในระบบ กด "+ เพิ่มเครื่องจักร" เพื่อเริ่มต้น<br><span style="font-size:12.5px;color:var(--text-dim);">No machines yet — click "+ Add Machine" to get started</span></div>`;
+    return;
+  }
+  if(stopped.length===0){
+    el.innerHTML = `<div class="all-clear"><div class="big">✅</div>ทุกเครื่องทำงานปกติ ไม่มีเครื่องหยุดทำงาน<br><span style="font-size:12.5px;color:var(--text-dim);">All machines running normally — nothing stopped</span></div>`;
+    return;
+  }
+  el.innerHTML = REASONS.map(r=>{
+    const rk = r.key;
+    const items = stopped.filter(m=>m.reason===rk);
+    if(items.length===0) return '';
+    return `
+      <div class="reason-group">
+        <div class="reason-title">
+          <div class="dot" style="background:${r.color};"></div>
+          <div class="txt">${r.emoji||''} ${escapeHtml(r.label)} <span style="font-weight:500;color:var(--text-dim);">· ${escapeHtml(r.labelEn||'')}</span></div>
+          <div class="count">${items.length} เครื่อง · ${items.length} units</div>
+        </div>
+        <div class="grid">
+          ${items.map(m=>{
+            const mc = cases.find(x=>x.id===m.currentCaseId && x.type==='case');
+            const stoppedSince = mc ? mc.startedAt : m.updatedAt;
+            const hd = heroDuration(Date.now()-stoppedSince);
+            const tCol = trackColor(m.track);
+            return `
+            <div class="card" style="--accent:${r.color};" onclick="openDetail('${m.id}')">
+              <div class="top-row">
+                <div class="name">${r.emoji||''} ${escapeHtml(m.name)}</div>
+                <div class="badge" style="background:${tint(tCol,0.14)};color:${tCol};" title="${escapeHtml(TRACK_LABEL_EN[m.track]||'')}"><span class="dot"></span>${escapeHtml(TRACK_LABEL[m.track]||'-')}</div>
+              </div>
+              <div class="reason-badge-inline">${r.emoji||''} ${escapeHtml(r.label)}</div>
+              <div class="hero">
+                <span class="num">${hd.num}</span><span class="unit">${hd.unit}</span>
+              </div>
+              <div class="stopped-since">หยุดทำงานมาแล้ว · เริ่ม <b>${fmtTimeShort(stoppedSince)}</b></div>
+              <div class="divider"></div>
+              <div class="meta-row">
+                <span>🏭 ${escapeHtml(m.dept||'-')}</span>
+                <span>📍 ${escapeHtml(m.line||'-')}</span>
+              </div>
+              ${m.note ? `<div class="reason-tag">${escapeHtml(m.note)}</div>` : ''}
+              ${m.updatedBy ? `
+              <div class="footer">
+                <div class="avatar" style="background:${r.color};">${escapeHtml(avatarInitial(m.updatedBy))}</div>
+                <div class="fname">${escapeHtml(m.updatedBy)}</div>
+              </div>` : ''}
+            </div>
+          `;}).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+let expandedCases = new Set();
+window.toggleCaseExpand = function(id){
+  if(expandedCases.has(id)) expandedCases.delete(id); else expandedCases.add(id);
+  renderLog();
+};
+
+// ---- History date-range filter ----
+let historyFilter = {type:'all', from:null, to:null};
+let historyDeptFilter = '', historyLineFilter = '', historyMachineFilter = '';
+function startOfDay(d){ const x=new Date(d); x.setHours(0,0,0,0); return x.getTime(); }
+function endOfDay(d){ const x=new Date(d); x.setHours(23,59,59,999); return x.getTime(); }
+function computeRange(type){
+  const now = new Date();
+  if(type==='today'){
+    return {from:startOfDay(now), to:endOfDay(now)};
+  }
+  if(type==='week'){
+    const day = now.getDay();
+    const diffToMonday = (day===0?6:day-1);
+    const monday = new Date(now); monday.setDate(now.getDate()-diffToMonday);
+    const sunday = new Date(monday); sunday.setDate(monday.getDate()+6);
+    return {from:startOfDay(monday), to:endOfDay(sunday)};
+  }
+  if(type==='month'){
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    const last = new Date(now.getFullYear(), now.getMonth()+1, 0);
+    return {from:startOfDay(first), to:endOfDay(last)};
+  }
+  if(type==='year'){
+    const first = new Date(now.getFullYear(),0,1);
+    const last = new Date(now.getFullYear(),11,31);
+    return {from:startOfDay(first), to:endOfDay(last)};
+  }
+  return {from:null, to:null};
+}
+function setHistoryFilter(type){
+  historyFilter.type = type;
+  if(type!=='custom'){
+    const r = computeRange(type);
+    historyFilter.from = r.from; historyFilter.to = r.to;
+  }
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.toggle('active', b.dataset.range===type));
+  document.getElementById('historyCustomRange').style.display = type==='custom' ? 'flex' : 'none';
+  renderLog();
+  renderLeaderboard();
+  renderTop5();
+}
+document.getElementById('historyFilterBar').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.filter-btn'); if(!btn) return;
+  setHistoryFilter(btn.dataset.range);
+});
+document.getElementById('historyApplyRange').onclick = ()=>{
+  const fromVal = document.getElementById('historyFromDate').value;
+  const toVal = document.getElementById('historyToDate').value;
+  if(!fromVal || !toVal) return;
+  historyFilter.type = 'custom';
+  historyFilter.from = startOfDay(new Date(fromVal+'T00:00:00'));
+  historyFilter.to = endOfDay(new Date(toVal+'T00:00:00'));
+  renderLog();
+  renderLeaderboard();
+  renderTop5();
+};
+
+// keeps the department/line/machine <select> options fresh (departments and machines can change)
+function renderHistoryFilterOptions(){
+  const deptSel = document.getElementById('historyDeptSelect');
+  const curDept = deptSel.value;
+  deptSel.innerHTML = '<option value="">แผนกทั้งหมด · All Departments</option>' +
+    DEPTS.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  deptSel.value = DEPTS.includes(curDept) ? curDept : '';
+  historyDeptFilter = deptSel.value;
+
+  const lineSel = document.getElementById('historyLineSelect');
+  const curLine = lineSel.value;
+  const lines = Array.from(new Set(machines.map(m=>m.line).filter(Boolean))).sort();
+  lineSel.innerHTML = '<option value="">ไลน์ทั้งหมด · All Lines</option>' +
+    lines.map(l=>`<option value="${escapeHtml(l)}">${escapeHtml(l)}</option>`).join('');
+  lineSel.value = lines.includes(curLine) ? curLine : '';
+  historyLineFilter = lineSel.value;
+
+  const machSel = document.getElementById('historyMachineSelect');
+  const curMach = machSel.value;
+  machSel.innerHTML = '<option value="">เครื่องจักรทั้งหมด · All Machines</option>' +
+    machines.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+  machSel.value = machines.some(m=>m.id===curMach) ? curMach : '';
+  historyMachineFilter = machSel.value;
+}
+document.getElementById('historyDeptSelect').addEventListener('change', function(){ historyDeptFilter = this.value; renderLog(); renderLeaderboard(); renderTop5(); });
+document.getElementById('historyLineSelect').addEventListener('change', function(){ historyLineFilter = this.value; renderLog(); renderLeaderboard(); renderTop5(); });
+document.getElementById('historyMachineSelect').addEventListener('change', function(){ historyMachineFilter = this.value; renderLog(); renderLeaderboard(); renderTop5(); });
+
+// shared by both the history list and the leaderboard, so both respect the same filters
+function getFilteredCases(){
+  let filtered = cases;
+  if(historyFilter.type!=='all' && historyFilter.from!=null && historyFilter.to!=null){
+    filtered = filtered.filter(c=>{
+      const t = c.type==='deleted' ? c.timestamp : c.startedAt;
+      return t>=historyFilter.from && t<=historyFilter.to;
+    });
+  }
+  if(historyDeptFilter || historyLineFilter || historyMachineFilter){
+    filtered = filtered.filter(c=>{
+      if(historyMachineFilter && c.machineId!==historyMachineFilter) return false;
+      if(historyDeptFilter || historyLineFilter){
+        const m = machines.find(x=>x.id===c.machineId);
+        // "contains" match (not exact) so a department later split by the admin
+        // (e.g. "Bonding & Check Bond" -> "Bonding" + "Check Bond") still catches
+        // machines/history recorded under the old combined name
+        if(historyDeptFilter && (!m || !m.dept || !m.dept.toLowerCase().includes(historyDeptFilter.toLowerCase()))) return false;
+        if(historyLineFilter && (!m || m.line!==historyLineFilter)) return false;
+      }
+      return true;
+    });
+  }
+  return filtered;
+}
+
+// shared by both the full leaderboard and the compact Top 5 widget
+function computeStopCounts(){
+  const filtered = getFilteredCases().filter(c=>c.type==='case');
+  const counts = {};
+  filtered.forEach(c=>{
+    if(!counts[c.machineId]) counts[c.machineId] = {name:c.machineName, count:0, totalMs:0};
+    counts[c.machineId].count++;
+    const end = c.resolvedAt || Date.now();
+    counts[c.machineId].totalMs += Math.max(0, end - c.startedAt);
+  });
+  return Object.values(counts).sort((a,b)=>b.count-a.count);
+}
+
+function renderLeaderboard(){
+  const el = document.getElementById('leaderboardList');
+  const ranked = computeStopCounts().slice(0,10);
+  if(ranked.length===0){
+    el.innerHTML = '<div class="empty">ยังไม่มีข้อมูลเพียงพอ · Not enough data yet</div>';
+    return;
+  }
+  el.innerHTML = ranked.map((r,i)=>`
+    <div class="log-item">
+      <div class="rank-num">${i+1}</div>
+      <div class="log-body" style="flex:1;">
+        <div class="line1">${escapeHtml(r.name)}</div>
+        <div class="desc">หยุดไปแล้ว ${r.count} ครั้ง · รวม ${formatDurationTH(r.totalMs)} · ${r.count} stops · ${formatDurationTH(r.totalMs)} total</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTop5(){
+  const el = document.getElementById('top5List');
+  const ranked = computeStopCounts().slice(0,5);
+  if(ranked.length===0){
+    el.innerHTML = '<div class="empty" style="padding:18px 0;">ยังไม่มีข้อมูล · No data yet</div>';
+    return;
+  }
+  const maxCount = ranked[0].count;
+  const medals = ['🥇','🥈','🥉'];
+  const medalBg = ['#FDF3D8','#EEF1F4','#F7E7DB'];
+  el.innerHTML = ranked.map((r,i)=>{
+    const pct = Math.max(8, Math.round((r.count/maxCount)*100));
+    const rankHtml = i<3
+      ? `<div class="top5-rank medal" style="background:${medalBg[i]};">${medals[i]}</div>`
+      : `<div class="top5-rank plain">${i+1}</div>`;
+    return `
+    <div class="top5-row">
+      ${rankHtml}
+      <div class="top5-info">
+        <div class="tname">${escapeHtml(r.name)}</div>
+        <div class="tstat">${r.count} ครั้ง · ${formatDurationTH(r.totalMs)}</div>
+        <div class="top5-bar-track"><div class="top5-bar-fill" style="width:${pct}%;"></div></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+document.getElementById('top5ViewAllBtn').onclick = ()=>{
+  const target = document.getElementById('leaderboardHead');
+  target.scrollIntoView({behavior:'smooth', block:'center'});
+  const box = document.getElementById('leaderboardList');
+  box.classList.remove('leaderboard-flash');
+  void box.offsetWidth; // restart the animation if clicked again
+  box.classList.add('leaderboard-flash');
+};
+
+function renderLog(){
+  const el = document.getElementById('logList');
+  let filteredCases = getFilteredCases();
+  if(filteredCases.length===0){
+    el.innerHTML = cases.length===0
+      ? '<div class="empty">ยังไม่มีประวัติเครื่องจักรหยุด · No downtime history yet</div>'
+      : '<div class="empty">ไม่มีประวัติในช่วงเวลาที่เลือก · No history in this time range</div>';
+    return;
+  }
+  el.innerHTML = filteredCases.slice(0,50).map(c=>{
+    if(c.type==='deleted'){
+      return `
+      <div class="log-item">
+        <div class="log-dot deleted"></div>
+        <div class="log-body" style="flex:1;">
+          <div class="line1">${escapeHtml(c.machineName||'ไม่ทราบเครื่อง / Unknown')} — ลบเครื่องจักรออกจากระบบ · Machine deleted</div>
+        </div>
+        <div class="log-time">${fmtTime(c.timestamp)}</div>
+        <button class="log-del" title="ลบรายการนี้ · Delete this entry" data-id="${c.id}">✕</button>
+      </div>`;
+    }
+    const ongoing = !c.resolvedAt;
+    const durationTxt = ongoing
+      ? formatDuration(Date.now()-c.startedAt) + ' (ต่อเนื่อง · so far)'
+      : formatDuration(c.resolvedAt - c.startedAt);
+    const firstDesc = (c.events && c.events[0]) ? c.events[0].desc : '';
+    const expanded = expandedCases.has(c.id);
+
+    let timelineHtml = '';
+    if(expanded){
+      const evs = c.events || [];
+      timelineHtml = `<div class="case-timeline">` + evs.map((ev, idx)=>{
+        let label, dotStyle;
+        if(idx===0){
+          label = `${reasonEmoji(c.reason)} หยุด: ${REASON_LABEL[c.reason]||'-'} · Stopped: ${REASON_LABEL_EN[c.reason]||'-'}`;
+          dotStyle = `background:${reasonColor(c.reason)};`;
+        } else if(ev.track==='resolved'){
+          label = 'แก้ไขแล้ว · Resolved';
+          dotStyle = `background:#2E8B57;`;
+        } else if(ev.kind==='note'){
+          label = 'บันทึกความคืบหน้า · Progress Note';
+          dotStyle = `background:#5A6FD8;`;
+        } else {
+          label = `อัปเดต: ${TRACK_LABEL[ev.track]||'-'} · Update: ${TRACK_LABEL_EN[ev.track]||'-'}`;
+          dotStyle = `background:${trackColor(ev.track)};`;
+        }
+        const descHtml = (idx!==0 && ev.desc) ? ` — ${escapeHtml(ev.desc)}` : '';
+        const byHtml = ev.reporter ? ` <span style="color:var(--text-dim);">— ${escapeHtml(ev.reporter)}</span>` : '';
+        const imgHtml = ev.image ? `<div class="tl-image"><img src="${ev.image}" onclick="window.open(this.src, '_blank')" title="คลิกเพื่อดูรูปใหญ่ · Click to view full size"></div>` : '';
+        return `
+        <div class="tl-point-wrap">
+          <div class="tl-point">
+            <div class="tl-dot" style="${dotStyle}"></div>
+            <div><span class="tl-time">${fmtTimeShort(ev.timestamp)}</span>${label}${descHtml}${byHtml}<span class="tl-controls">
+              <button class="tl-btn tl-edit" data-case="${c.id}" data-idx="${idx}" title="แก้ไข · Edit">✎</button>
+              <button class="tl-btn tl-del" data-case="${c.id}" data-idx="${idx}" title="ลบ · Delete">✕</button>
+            </span></div>
+          </div>
+          ${imgHtml}
+        </div>`;
+      }).join('') + `</div>`;
+    }
+
+    return `
+    <div class="log-item">
+      <div class="log-dot" style="background:${ongoing ? reasonColor(c.reason) : '#2E8B57'};"></div>
+      <div class="log-body" style="flex:1;">
+        <div class="line1" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          ${escapeHtml(c.machineName)}
+          <span class="case-status-pill ${ongoing?'ongoing':'done'}">${ongoing?'ยังไม่แก้ไข · Ongoing':'แก้ไขแล้ว · Resolved'}</span>
+        </div>
+        <div class="case-reason-line"><b>${reasonEmoji(c.reason)} ${REASON_LABEL[c.reason]||'-'} · ${REASON_LABEL_EN[c.reason]||'-'}</b>${firstDesc ? ' — '+escapeHtml(firstDesc) : ''}</div>
+        <div class="case-duration">ระยะเวลาหยุด · Downtime: ${durationTxt}</div>
+        <button class="toggle-timeline-btn" onclick="toggleCaseExpand('${c.id}')">${expanded ? '▲ ซ่อนไทม์ไลน์ · Hide Timeline' : `▼ ดูไทม์ไลน์ · View Timeline (${(c.events||[]).length})`}</button>
+        ${timelineHtml}
+      </div>
+      <button class="log-del" title="ลบเคสทั้งหมด · Delete entire case" data-id="${c.id}">✕</button>
+    </div>`;
+  }).join('');
+}
+
+// ---- Edit / delete individual timeline entries ----
+const editPointOverlay = document.getElementById('editPointOverlay');
+let editTarget = null;
+function openEditPoint(caseId, idx){
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const ev = c.events[idx]; if(!ev) return;
+  editTarget = {caseId, idx};
+  document.getElementById('editPointMeta').textContent = c.machineName;
+  document.getElementById('editPointTime').value = toLocalInputValue(ev.timestamp);
+  document.getElementById('editPointDesc').value = ev.desc || '';
+  populateReasonSelect('editPointReason', c.reason || (REASONS[0] ? REASONS[0].key : null));
+  populateTrackSelect('editPointTrack', TRACKS.find(t=>t.key===ev.track) ? ev.track : null);
+  editPointImageData = ev.image || null;
+  if(ev.image){
+    document.getElementById('editPointImagePreview').src = ev.image;
+    document.getElementById('editPointImagePreviewWrap').style.display='block';
+  } else {
+    document.getElementById('editPointImagePreviewWrap').style.display='none';
+  }
+  renderReporterSelect('editPointReporter', 'editPointReporterOther', ev.reporter || null);
+  editPointOverlay.classList.add('show');
+}
+document.getElementById('editPointCancel').onclick = ()=> editPointOverlay.classList.remove('show');
+document.getElementById('editPointSave').onclick = async ()=>{
+  if(!editTarget) return;
+  const c = cases.find(x=>x.id===editTarget.caseId);
+  if(c){
+    const ev = c.events[editTarget.idx];
+    if(ev){
+      ev.timestamp = fromLocalInputValue(document.getElementById('editPointTime').value);
+      ev.desc = document.getElementById('editPointDesc').value.trim();
+      ev.image = editPointImageData || null;
+      ev.reporter = getReporterValue('editPointReporter','editPointReporterOther');
+      const newTrack = document.getElementById('editPointTrack').value;
+      if(newTrack) ev.track = newTrack;
+      const newReason = document.getElementById('editPointReason').value;
+      if(newReason) c.reason = newReason;
+      c.events.sort((a,b)=>a.timestamp-b.timestamp);
+      c.startedAt = c.events[0].timestamp;
+      const resolvedEv = c.events.slice().reverse().find(e=>e.track==='resolved');
+      c.resolvedAt = resolvedEv ? resolvedEv.timestamp : null;
+      await saveCases();
+      render();
+    }
+  }
+  editTarget = null;
+  editPointOverlay.classList.remove('show');
+};
+
+async function deleteTimelinePoint(caseId, idx){
+  const c = cases.find(x=>x.id===caseId); if(!c) return;
+  const wasResolved = !!c.resolvedAt;
+  c.events.splice(idx,1);
+  if(c.events.length===0){
+    cases = cases.filter(x=>x.id!==caseId);
+  } else {
+    c.events.sort((a,b)=>a.timestamp-b.timestamp);
+    c.startedAt = c.events[0].timestamp;
+    const resolvedEv = c.events.slice().reverse().find(e=>e.track==='resolved');
+    c.resolvedAt = resolvedEv ? resolvedEv.timestamp : null;
+    if(wasResolved && !c.resolvedAt){
+      const m = machines.find(x=>x.id===c.machineId);
+      if(m && m.status==='run' && !m.currentCaseId){
+        const lastTrackEv = c.events.slice().reverse().find(e=>e.track && e.track!=='resolved');
+        m.status='stopped'; m.currentCaseId=c.id; m.reason=c.reason;
+        m.track = lastTrackEv ? lastTrackEv.track : 'pending';
+        m.updatedAt = Date.now();
+        await saveMachines();
+      }
+    }
+  }
+  await saveCases();
+  render();
+}
+
+document.getElementById('logList').addEventListener('click', (e)=>{
+  const editBtn = e.target.closest('.tl-edit');
+  if(editBtn){ openEditPoint(editBtn.dataset.case, parseInt(editBtn.dataset.idx,10)); return; }
+  const delPtBtn = e.target.closest('.tl-del');
+  if(delPtBtn){
+    const caseId = delPtBtn.dataset.case, idx = parseInt(delPtBtn.dataset.idx,10);
+    showConfirm('ลบจุดไทม์ไลน์นี้ · Delete Timeline Entry', 'ลบจุดนี้ออกจากไทม์ไลน์ใช่หรือไม่? · Delete this timeline entry?', async ()=>{
+      await deleteTimelinePoint(caseId, idx);
+    });
+    return;
+  }
+  const btn = e.target.closest('.log-del');
+  if(!btn) return;
+  const id = btn.dataset.id;
+  showConfirm('ลบประวัตินี้ · Delete Entry', 'ลบเคสประวัตินี้ทั้งหมดใช่หรือไม่? · Delete this entire case?', async ()=>{
+    cases = cases.filter(x=>x.id!==id);
+    expandedCases.delete(id);
+    await saveCases();
+    renderLog();
+  });
+});
+function doClearLog(){
+  if(cases.length===0) return;
+  showConfirm('ล้างประวัติทั้งหมด · Clear All History', 'ล้างประวัติเครื่องจักรหยุดทั้งหมดใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้ · Clear all downtime history? This cannot be undone.', async ()=>{
+    cases = [];
+    expandedCases.clear();
+    await saveCases();
+    renderLog();
+    renderLeaderboard();
+    renderTop5();
+  });
+}
+document.getElementById('clearLogBtn').onclick = ()=>{
+  if(isAdmin){ doClearLog(); return; }
+  pendingAdminAction = 'clearLog';
+  document.getElementById('adminPinInput').value='';
+  document.getElementById('adminLoginError').style.display='none';
+  adminLoginOverlay.classList.add('show');
+};
+
+function renderMachineSelect(){
+  const sel = document.getElementById('reportMachineSelect');
+  sel.innerHTML = '<option value="">— เลือกเครื่องจักร · Select Machine —</option>' +
+    machines.map(m=>`<option value="${m.id}">${escapeHtml(m.name)}</option>`).join('');
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// ---- Report modal ----
+const reportOverlay = document.getElementById('reportOverlay');
+let reportReason = null, reportTrack = null;
+
+// reason/track <select> dropdowns, matching the machine picker's style — blank ("—") until
+// the person explicitly chooses, so nobody accidentally submits with the first option by default
+function populateReasonSelect(selectId, selectedKey){
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = '<option value="">— เลือกสาเหตุ · Select Reason —</option>' +
+    REASONS.map(r=>`<option value="${r.key}">${r.emoji||''} ${escapeHtml(r.label)} · ${escapeHtml(r.labelEn||'')}</option>`).join('');
+  sel.value = selectedKey || '';
+}
+function populateTrackSelect(selectId, selectedKey){
+  const sel = document.getElementById(selectId);
+  sel.innerHTML = '<option value="">— เลือกสถานะ · Select Status —</option>' +
+    TRACKS.map(t=>`<option value="${t.key}">${escapeHtml(t.label)} · ${escapeHtml(t.labelEn||'')}</option>`).join('');
+  sel.value = selectedKey || '';
+}
+
+// reporter <select> populated from the admin-managed staff list, with a manual "Other" fallback.
+// Blank by default (unless prefill is given) so nobody accidentally leaves the first name selected.
+function renderReporterSelect(selectId, otherId, prefill){
+  const sel = document.getElementById(selectId);
+  const otherInput = document.getElementById(otherId);
+  const opts = STAFF.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join('');
+  sel.innerHTML = '<option value="">— เลือกผู้แจ้ง · Select Reporter —</option>' + opts +
+    `<option value="__other__">อื่นๆ (พิมพ์เอง) · Other (type manually)</option>`;
+  if(prefill && STAFF.includes(prefill)){
+    sel.value = prefill; otherInput.value=''; otherInput.style.display='none';
+  } else if(prefill){
+    sel.value = '__other__'; otherInput.value = prefill; otherInput.style.display='block';
+  } else {
+    sel.value = '';
+    otherInput.value=''; otherInput.style.display='none';
+  }
+  sel.onchange = ()=>{ otherInput.style.display = sel.value==='__other__' ? 'block' : 'none'; };
+}
+function getReporterValue(selectId, otherId){
+  const sel = document.getElementById(selectId);
+  if(sel.value==='__other__'){
+    return document.getElementById(otherId).value.trim() || 'ไม่ระบุ';
+  }
+  return sel.value || 'ไม่ระบุ';
+}
+
+function clearReportErrors(){
+  ['reportMachineSelect','reportTime','reportReasonSelect','reportTrackSelect','reportName'].forEach(id=>{
+    document.getElementById(id).classList.remove('input-error');
+  });
+  ['reportMachineError','reportTimeError','reportReasonError','reportTrackError','reportNameError'].forEach(id=>{
+    document.getElementById(id).style.display='none';
+  });
+}
+function setFieldError(controlId, errorId, msgText){
+  document.getElementById(controlId).classList.add('input-error');
+  const e = document.getElementById(errorId);
+  e.textContent = msgText;
+  e.style.display='block';
+}
+function clearFieldError(controlId, errorId){
+  document.getElementById(controlId).classList.remove('input-error');
+  document.getElementById(errorId).style.display='none';
+}
+function validateReportForm(){
+  clearReportErrors();
+  let valid = true;
+  if(!document.getElementById('reportMachineSelect').value){
+    setFieldError('reportMachineSelect','reportMachineError','กรุณาเลือกเครื่องจักร · Please select a machine');
+    valid = false;
+  }
+  if(!document.getElementById('reportTime').value){
+    setFieldError('reportTime','reportTimeError','กรุณาระบุเวลาที่เริ่มหยุดเครื่อง · Please set the start time');
+    valid = false;
+  }
+  if(!reportReason){
+    setFieldError('reportReasonSelect','reportReasonError','กรุณาเลือกสาเหตุที่หยุด · Please select a reason');
+    valid = false;
+  }
+  if(!reportTrack){
+    setFieldError('reportTrackSelect','reportTrackError','กรุณาเลือกสถานะการติดตาม · Please select a tracking status');
+    valid = false;
+  }
+  const sel = document.getElementById('reportName');
+  const reporterVal = sel.value==='__other__' ? document.getElementById('reportNameOther').value.trim() : sel.value;
+  if(!reporterVal){
+    setFieldError('reportName','reportNameError','กรุณาเลือกหรือกรอกชื่อผู้แจ้ง · Please select or enter a reporter name');
+    valid = false;
+  }
+  return valid;
+}
+
+document.getElementById('reportFab').onclick = ()=>{
+  document.getElementById('reportDesc').value='';
+  document.getElementById('reportTime').value = toLocalInputValue(Date.now());
+  reportImageData = null;
+  document.getElementById('reportImagePreviewWrap').style.display='none';
+  document.getElementById('reportMachineSelect').value='';
+  reportReason = null;
+  reportTrack = null;
+  populateReasonSelect('reportReasonSelect', null);
+  populateTrackSelect('reportTrackSelect', null);
+  renderReporterSelect('reportName', 'reportNameOther', null);
+  clearReportErrors();
+  reportOverlay.classList.add('show');
+};
+document.getElementById('reportCancel').onclick = ()=> reportOverlay.classList.remove('show');
+document.getElementById('reportMachineSelect').addEventListener('change', ()=> clearFieldError('reportMachineSelect','reportMachineError'));
+document.getElementById('reportTime').addEventListener('input', ()=> clearFieldError('reportTime','reportTimeError'));
+document.getElementById('reportReasonSelect').addEventListener('change', function(){ reportReason = this.value || null; clearFieldError('reportReasonSelect','reportReasonError'); });
+document.getElementById('reportTrackSelect').addEventListener('change', function(){ reportTrack = this.value || null; clearFieldError('reportTrackSelect','reportTrackError'); });
+document.getElementById('reportName').addEventListener('change', ()=> clearFieldError('reportName','reportNameError'));
+document.getElementById('reportNameOther').addEventListener('input', ()=> clearFieldError('reportName','reportNameError'));
+document.getElementById('reportSubmit').onclick = async ()=>{
+  if(!validateReportForm()) return;
+  const machineId = document.getElementById('reportMachineSelect').value;
+  const desc = document.getElementById('reportDesc').value.trim();
+  const reporter = getReporterValue('reportName','reportNameOther');
+  const now = fromLocalInputValue(document.getElementById('reportTime').value);
+  const m = machines.find(x=>x.id===machineId);
+  if(!m) return;
+  touchCase(m, reportReason, reportTrack, desc, reporter, now, true, reportImageData);
+  m.status='stopped'; m.reason=reportReason; m.track=reportTrack; m.note=desc; m.updatedAt=now; m.updatedBy=reporter;
+  await saveMachines(); await saveCases(); render();
+  reportOverlay.classList.remove('show');
+};
+
+// ---- Detail modal ----
+const detailOverlay = document.getElementById('detailOverlay');
+window.openDetail = function(id){
+  const m = machines.find(x=>x.id===id);
+  if(!m) return;
+  selectedMachineId = id;
+  document.getElementById('detailName').textContent = m.name;
+  document.getElementById('detailMeta').textContent = `${m.dept||'-'} · ${m.line||'-'} · อัปเดตล่าสุด ${fmtTime(m.updatedAt)}`;
+  document.getElementById('detailNote').value='';
+  detailImageData = null;
+  document.getElementById('detailImagePreviewWrap').style.display='none';
+  renderReporterSelect('detailReporter', 'detailReporterOther', m.updatedBy && m.updatedBy!=='ระบบ' ? m.updatedBy : null);
+  document.getElementById('detailTime').value = toLocalInputValue(Date.now());
+  populateReasonSelect('detailReasonSelect', m.reason || (REASONS[0] ? REASONS[0].key : null));
+  populateTrackSelect('detailTrackSelect', m.track || (TRACKS.find(t=>t.key==='pending') ? 'pending' : (TRACKS[0] ? TRACKS[0].key : null)));
+  detailOverlay.classList.add('show');
+};
+document.getElementById('setRunBtn').onclick = async ()=>{
+  const m = machines.find(x=>x.id===selectedMachineId);
+  if(!m) return;
+  const reporter = getReporterValue('detailReporter','detailReporterOther');
+  const now = fromLocalInputValue(document.getElementById('detailTime').value);
+  resolveCase(m, reporter, now, detailImageData);
+  m.status='run'; m.reason=null; m.track=null; m.note=''; m.updatedAt=now; m.updatedBy=reporter;
+  await saveMachines(); await saveCases(); render();
+  detailOverlay.classList.remove('show');
+};
+document.getElementById('detailAddNote').onclick = async ()=>{
+  const m = machines.find(x=>x.id===selectedMachineId);
+  if(!m) return;
+  const note = document.getElementById('detailNote').value.trim();
+  if(!note){ document.getElementById('detailNote').focus(); return; }
+  const reporter = getReporterValue('detailReporter','detailReporterOther');
+  const now = fromLocalInputValue(document.getElementById('detailTime').value);
+  const ok = addProgressNote(m, note, reporter, now, detailImageData);
+  if(ok){
+    m.note = note; m.updatedAt = now; m.updatedBy = reporter;
+    await saveMachines(); await saveCases(); render();
+    document.getElementById('detailNote').value='';
+    detailOverlay.classList.remove('show');
+  }
+};
+document.getElementById('detailCancel').onclick = ()=> detailOverlay.classList.remove('show');
+document.getElementById('detailSave').onclick = async ()=>{
+  const m = machines.find(x=>x.id===selectedMachineId);
+  if(!m) return;
+  const reason = document.getElementById('detailReasonSelect').value || m.reason;
+  const track = document.getElementById('detailTrackSelect').value || m.track;
+  const note = document.getElementById('detailNote').value.trim();
+  const reporter = getReporterValue('detailReporter','detailReporterOther');
+  const now = fromLocalInputValue(document.getElementById('detailTime').value);
+  touchCase(m, reason, track, note, reporter, now, false, detailImageData);
+  m.status='stopped'; m.reason=reason; m.track=track;
+  if(note) m.note = note;
+  m.updatedAt = now; m.updatedBy = reporter;
+  await saveMachines(); await saveCases(); render();
+  detailOverlay.classList.remove('show');
+};
+document.getElementById('detailDelete').onclick = ()=>{
+  const m = machines.find(x=>x.id===selectedMachineId);
+  if(!m) return;
+  showConfirm('ลบรายการแจ้งนี้ · Delete This Report', `ลบรายการแจ้งเครื่องหยุดของ "${m.name}" ใช่หรือไม่? เครื่องจักรจะกลับไปเป็นสถานะปกติ แต่จะไม่ถูกลบออกจากระบบ · Delete this downtime report? The machine will return to normal status but stays in the system.`, async ()=>{
+    const now = Date.now();
+    if(m.currentCaseId){
+      cases = cases.filter(c=>c.id!==m.currentCaseId);
+    }
+    m.status='run'; m.reason=null; m.track=null; m.note=''; m.currentCaseId=null; m.updatedAt=now; m.updatedBy='ผู้ใช้งาน';
+    await saveMachines(); await saveCases(); render();
+    detailOverlay.classList.remove('show');
+  });
+};
+
+// ---- Add machine modal ----
+const addOverlay = document.getElementById('addOverlay');
+document.getElementById('addMachineBtn').onclick = ()=>{
+  document.getElementById('addName').value='';
+  const deptSel = document.getElementById('addDept');
+  deptSel.innerHTML = DEPTS.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+  document.getElementById('addLine').value='SMD1';
+  addOverlay.classList.add('show');
+};
+document.getElementById('addCancel').onclick = ()=> addOverlay.classList.remove('show');
+document.getElementById('addSave').onclick = async ()=>{
+  const name = document.getElementById('addName').value.trim();
+  if(!name){ document.getElementById('addName').focus(); return; }
+  const dept = document.getElementById('addDept').value;
+  const line = document.getElementById('addLine').value.trim();
+  const id = 'm'+Date.now();
+  machines.push({id, name, dept, line, status:'run', reason:null, track:null, note:'', currentCaseId:null, updatedAt:Date.now(), updatedBy:'ผู้ใช้งาน'});
+  await saveMachines(); render();
+  addOverlay.classList.remove('show');
+};
+
+// ---- Manage machines (open to everyone) ----
+const manageMachinesOverlay = document.getElementById('manageMachinesOverlay');
+function renderManageMachinesList(){
+  const el = document.getElementById('manageMachinesList');
+  if(machines.length===0){ el.innerHTML = '<div class="empty">ยังไม่มีเครื่องจักรในระบบ · No machines yet</div>'; return; }
+  el.innerHTML = machines.map(m=>{
+    const statusTxt = m.status==='run' ? 'ปกติ · Running' : `${reasonEmoji(m.reason)} ${REASON_LABEL[m.reason]||'-'}`;
+    return `
+    <div class="manage-machine-row">
+      <div class="manage-machine-info">
+        <div class="mname">${escapeHtml(m.name)}</div>
+        <div class="mmeta">${escapeHtml(m.dept||'-')} · ${escapeHtml(m.line||'-')} · ${statusTxt}</div>
+      </div>
+      <button class="btn btn-outline-danger btn-sm" data-id="${m.id}" title="ลบเครื่องจักร · Delete machine">🗑 ลบ</button>
+    </div>`;
+  }).join('');
+}
+document.getElementById('manageMachinesBtn').onclick = ()=>{
+  renderManageMachinesList();
+  manageMachinesOverlay.classList.add('show');
+};
+document.getElementById('manageMachinesClose').onclick = ()=> manageMachinesOverlay.classList.remove('show');
+document.getElementById('manageMachinesList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button[data-id]'); if(!btn) return;
+  const id = btn.dataset.id;
+  const m = machines.find(x=>x.id===id);
+  if(!m) return;
+  showConfirm(
+    'ลบเครื่องจักร · Delete Machine',
+    `ลบ "${m.name}" ออกจากระบบใช่หรือไม่? การกระทำนี้ไม่สามารถย้อนกลับได้ (ประวัติเก่าของเครื่องนี้จะยังอยู่ในหน้าประวัติ) · Delete this machine? This cannot be undone (its past history stays in the History section).`,
+    async ()=>{
+      machines = machines.filter(x=>x.id!==id);
+      await saveMachines();
+      renderManageMachinesList();
+      render();
+    }
+  );
+});
+
+// ---- Admin: login + panel ----
+const adminLoginOverlay = document.getElementById('adminLoginOverlay');
+const adminPanelOverlay = document.getElementById('adminPanelOverlay');
+
+document.getElementById('adminBtn').onclick = ()=>{
+  pendingAdminAction = null;
+  if(isAdmin){ openAdminPanel(); return; }
+  document.getElementById('adminPinInput').value='';
+  document.getElementById('adminLoginError').style.display='none';
+  adminLoginOverlay.classList.add('show');
+};
+document.getElementById('adminLoginCancel').onclick = ()=>{ pendingAdminAction = null; adminLoginOverlay.classList.remove('show'); };
+document.getElementById('adminLoginSubmit').onclick = ()=>{
+  const val = document.getElementById('adminPinInput').value.trim();
+  if(val && val===ADMIN_PIN){
+    isAdmin = true;
+    adminLoginOverlay.classList.remove('show');
+    if(pendingAdminAction==='clearLog'){
+      pendingAdminAction = null;
+      doClearLog();
+    } else {
+      openAdminPanel();
+    }
+  } else {
+    document.getElementById('adminLoginError').style.display='block';
+  }
+};
+document.getElementById('adminPinInput').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter') document.getElementById('adminLoginSubmit').click();
+});
+
+function openAdminPanel(){ renderAdminLists(); adminPanelOverlay.classList.add('show'); }
+document.getElementById('adminPanelClose').onclick = ()=> adminPanelOverlay.classList.remove('show');
+document.getElementById('adminLogoutBtn').onclick = ()=>{ isAdmin=false; adminPanelOverlay.classList.remove('show'); };
+
+function renderAdminLists(){
+  const rEl = document.getElementById('adminReasonList');
+  rEl.innerHTML = REASONS.length ? REASONS.map(r=>`
+    <span class="admin-chip" style="background:${tint(r.color,0.14)};color:${r.color};border-color:${r.color};">
+      ${r.emoji||''} ${escapeHtml(r.label)}${r.labelEn?` / ${escapeHtml(r.labelEn)}`:''}
+      <button data-key="${r.key}" title="ลบ · Delete">✕</button>
+    </span>`).join('') : '<span class="hint">ยังไม่มีสาเหตุ · No reasons yet</span>';
+
+  const tEl = document.getElementById('adminTrackList');
+  tEl.innerHTML = TRACKS.length ? TRACKS.map(t=>`
+    <span class="admin-chip" style="background:${tint(t.color,0.14)};color:${t.color};border-color:${t.color};">
+      ${escapeHtml(t.label)}${t.labelEn?` / ${escapeHtml(t.labelEn)}`:''}
+      <button data-key="${t.key}" title="ลบ · Delete">✕</button>
+    </span>`).join('') : '<span class="hint">ยังไม่มีสถานะ · No statuses yet</span>';
+
+  const sEl = document.getElementById('adminStaffList');
+  sEl.innerHTML = STAFF.length ? STAFF.map(n=>`
+    <span class="admin-chip" style="background:${tint('#1857B8',0.1)};color:var(--blue-deep);border-color:var(--line);">
+      ${escapeHtml(n)}
+      <button data-name="${escapeHtml(n)}" title="ลบ · Delete">✕</button>
+    </span>`).join('') : '<span class="hint">ยังไม่มีรายชื่อ · No names yet</span>';
+
+  const dEl = document.getElementById('adminDeptList');
+  dEl.innerHTML = DEPTS.length ? DEPTS.map(d=>`
+    <span class="admin-chip" style="background:${tint('#3E8E7E',0.1)};color:#3E8E7E;border-color:var(--line);">
+      ${escapeHtml(d)}
+      <button data-dept="${escapeHtml(d)}" title="ลบ · Delete">✕</button>
+    </span>`).join('') : '<span class="hint">ยังไม่มีแผนก · No departments yet</span>';
+}
+
+document.getElementById('adminReasonList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const key = btn.dataset.key;
+  if(REASONS.length<=1) return; // keep at least one reason so the pickers never end up empty
+  showConfirm('ลบสาเหตุนี้ · Delete Reason', 'ลบสาเหตุนี้ออกจากระบบใช่หรือไม่? ข้อมูลเก่าที่เคยใช้สาเหตุนี้จะยังคงอยู่ · Delete this reason? Existing records using it are kept as-is.', async ()=>{
+    REASONS = REASONS.filter(r=>r.key!==key);
+    rebuildLabelMaps();
+    await saveReasons();
+    renderAdminLists();
+    render();
+  });
+});
+document.getElementById('adminTrackList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const key = btn.dataset.key;
+  if(TRACKS.length<=1) return;
+  showConfirm('ลบสถานะนี้ · Delete Status', 'ลบสถานะการติดตามนี้ออกจากระบบใช่หรือไม่? ข้อมูลเก่าที่เคยใช้สถานะนี้จะยังคงอยู่ · Delete this status? Existing records using it are kept as-is.', async ()=>{
+    TRACKS = TRACKS.filter(t=>t.key!==key);
+    rebuildLabelMaps();
+    await saveTracks();
+    renderAdminLists();
+    render();
+  });
+});
+document.getElementById('adminStaffList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const name = btn.dataset.name;
+  STAFF = STAFF.filter(n=>n!==name);
+  await saveStaff();
+  renderAdminLists();
+});
+document.getElementById('adminDeptList').addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button'); if(!btn) return;
+  const dept = btn.dataset.dept;
+  if(DEPTS.length<=1) return; // keep at least one department
+  DEPTS = DEPTS.filter(d=>d!==dept);
+  await saveDepts();
+  renderAdminLists();
+});
+
+document.getElementById('addReasonBtn').onclick = async ()=>{
+  const emoji = document.getElementById('newReasonEmoji').value.trim();
+  const th = document.getElementById('newReasonTh').value.trim();
+  const en = document.getElementById('newReasonEn').value.trim();
+  if(!th) return;
+  REASONS.push({key:'r'+Date.now(), label:th, labelEn: en||th, color: nextColor(REASONS.length), emoji: emoji||DEFAULT_EMOJI});
+  rebuildLabelMaps();
+  await saveReasons();
+  document.getElementById('newReasonEmoji').value=''; document.getElementById('newReasonTh').value=''; document.getElementById('newReasonEn').value='';
+  renderAdminLists();
+  render();
+};
+document.getElementById('addTrackBtn').onclick = async ()=>{
+  const th = document.getElementById('newTrackTh').value.trim();
+  const en = document.getElementById('newTrackEn').value.trim();
+  if(!th) return;
+  TRACKS.push({key:'t'+Date.now(), label:th, labelEn: en||th, color: nextColor(TRACKS.length)});
+  rebuildLabelMaps();
+  await saveTracks();
+  document.getElementById('newTrackTh').value=''; document.getElementById('newTrackEn').value='';
+  renderAdminLists();
+  render();
+};
+document.getElementById('addStaffBtn').onclick = async ()=>{
+  const name = document.getElementById('newStaffName').value.trim();
+  if(!name) return;
+  if(!STAFF.includes(name)) STAFF.push(name);
+  await saveStaff();
+  document.getElementById('newStaffName').value='';
+  renderAdminLists();
+};
+document.getElementById('addDeptBtn').onclick = async ()=>{
+  const name = document.getElementById('newDeptName').value.trim();
+  if(!name) return;
+  if(!DEPTS.includes(name)) DEPTS.push(name);
+  await saveDepts();
+  document.getElementById('newDeptName').value='';
+  renderAdminLists();
+};
+document.getElementById('changePinBtn').onclick = async ()=>{
+  const v = document.getElementById('newAdminPin').value.trim();
+  if(!v) return;
+  ADMIN_PIN = v;
+  await saveAdminPin();
+  document.getElementById('newAdminPin').value='';
+};
+
+// ---- Backup / restore ----
+function downloadBlob(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function tsStamp(){
+  const d = new Date();
+  const p = n=>String(n).padStart(2,'0');
+  return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`;
+}
+function csvField(v){
+  const s = String(v==null?'':v);
+  return /[",\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+}
+document.getElementById('exportJsonBtn').onclick = ()=>{
+  const backup = { exportedAt: Date.now(), machines, cases, reasonTypes:REASONS, trackTypes:TRACKS, staffList:STAFF };
+  downloadBlob(new Blob([JSON.stringify(backup,null,2)],{type:'application/json'}), `machine-downtime-backup-${tsStamp()}.json`);
+};
+const exportTextOverlay = document.getElementById('exportTextOverlay');
+document.getElementById('exportTextBtn').onclick = ()=>{
+  const backup = { exportedAt: Date.now(), machines, cases, reasonTypes:REASONS, trackTypes:TRACKS, staffList:STAFF };
+  document.getElementById('exportTextArea').value = JSON.stringify(backup, null, 2);
+  document.getElementById('exportCopyStatus').style.display='none';
+  exportTextOverlay.classList.add('show');
+};
+document.getElementById('exportTextClose').onclick = ()=> exportTextOverlay.classList.remove('show');
+document.getElementById('exportTextCopy').onclick = async ()=>{
+  const ta = document.getElementById('exportTextArea');
+  ta.focus(); ta.select();
+  const statusEl = document.getElementById('exportCopyStatus');
+  let copied = false;
+  try{
+    await navigator.clipboard.writeText(ta.value);
+    copied = true;
+  }catch(e){
+    try{ copied = document.execCommand('copy'); }catch(e2){ copied = false; }
+  }
+  statusEl.style.display='block';
+  statusEl.style.color = copied ? '#2E8B57' : 'var(--breakdown)';
+  statusEl.textContent = copied
+    ? 'คัดลอกแล้ว วางที่ไหนก็ได้ · Copied — paste it anywhere'
+    : 'คัดลอกอัตโนมัติไม่ได้ กรุณากด Ctrl+C (หรือแตะค้างแล้วเลือกคัดลอก) · Auto-copy failed — press Ctrl+C or long-press to copy manually';
+};
+document.getElementById('exportCsvBtn').onclick = ()=>{
+  const header = ['เครื่องจักร','แผนก','ไลน์','สาเหตุ','สถานะ','รายละเอียด','ผู้แจ้ง','เวลาเริ่มหยุด','เวลาแก้ไขเสร็จ','ระยะเวลาหยุด(นาที)'];
+  const rows = [header];
+  cases.filter(c=>c.type==='case').forEach(c=>{
+    const m = machines.find(x=>x.id===c.machineId);
+    const first = (c.events && c.events[0]) || {};
+    const durMin = Math.round(((c.resolvedAt||Date.now())-c.startedAt)/60000);
+    rows.push([
+      c.machineName, m?m.dept:'', m?m.line:'',
+      REASON_LABEL[c.reason]||c.reason||'',
+      c.resolvedAt?'แก้ไขแล้ว':'ยังไม่แก้ไข',
+      first.desc||'', first.reporter||'',
+      fmtTime(c.startedAt),
+      c.resolvedAt?fmtTime(c.resolvedAt):'',
+      durMin
+    ]);
+  });
+  const csv = rows.map(r=>r.map(csvField).join(',')).join('\r\n');
+  downloadBlob(new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'}), `machine-downtime-history-${tsStamp()}.csv`);
+};
+document.getElementById('importBtn').onclick = ()=>{
+  document.getElementById('importError').style.display='none';
+  document.getElementById('importFileInput').click();
+};
+document.getElementById('importFileInput').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  const errEl = document.getElementById('importError');
+  errEl.style.display='none';
+  if(!file) return;
+  try{
+    const text = await file.text();
+    const data = JSON.parse(text);
+    if(!data || !Array.isArray(data.machines) || !Array.isArray(data.cases)){
+      errEl.textContent = 'ไฟล์นี้ไม่ใช่ไฟล์สำรองที่ถูกต้อง · This does not look like a valid backup file';
+      errEl.style.display='block';
+      e.target.value='';
+      return;
+    }
+    showConfirm(
+      'นำเข้าข้อมูล · Import Backup',
+      'การนำเข้าจะเขียนทับข้อมูลปัจจุบันทั้งหมด (เครื่องจักร ประวัติ สาเหตุ สถานะ รายชื่อ) ใช่หรือไม่? · This will overwrite ALL current data. Continue?',
+      async ()=>{
+        machines = data.machines || [];
+        cases = data.cases || [];
+        REASONS = (data.reasonTypes && data.reasonTypes.length) ? data.reasonTypes : defaultReasons();
+        TRACKS = (data.trackTypes && data.trackTypes.length) ? data.trackTypes : defaultTracks();
+        STAFF = data.staffList || [];
+        rebuildLabelMaps();
+        await saveMachines(); await saveCases(); await saveReasons(); await saveTracks(); await saveStaff();
+        renderAdminLists();
+        render();
+        e.target.value='';
+      },
+      {confirmLabel:'นำเข้า · Import', confirmClass:'btn btn-primary'}
+    );
+  }catch(err){
+    errEl.textContent = 'ไม่สามารถอ่านไฟล์นี้ได้ กรุณาตรวจสอบไฟล์อีกครั้ง · Could not read this file';
+    errEl.style.display='block';
+    e.target.value='';
+  }
+});
+
+[reportOverlay, detailOverlay, addOverlay, confirmOverlay, editPointOverlay, adminLoginOverlay, adminPanelOverlay, exportTextOverlay, manageMachinesOverlay].forEach(ov=>{
+  ov.addEventListener('click', (e)=>{ if(e.target===ov) ov.classList.remove('show'); });
+});
+
+loadData();
+</script>
+</body>
+</html>
